@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="vi">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MES · Điều hành sản xuất</title><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head>
+<body>
+<section id="login-screen" class="login-screen">
+  <div class="login-intro"><div class="wordmark">M<span>·</span>ES <small>OPERATIONS PLATFORM</small></div><p class="eyebrow">TỪ KẾ HOẠCH ĐẾN THÀNH PHẨM</p><h1>Mỗi công đoạn.<br>Một nguồn dữ liệu.</h1><p>Theo dõi sản xuất, chất lượng và nguyên vật liệu trên cùng một nền tảng cho nhiều nhà máy.</p><div class="intro-line"><span>01 / Điều hành</span><span>02 / Chất lượng</span><span>03 / Truy xuất</span></div></div>
+  <form id="login-form" class="login-card"><div class="eyebrow">KHÔNG GIAN LÀM VIỆC</div><h2>Đăng nhập MES</h2><p>Sử dụng tài khoản được quản trị viên cấp.</p><label>Tên đăng nhập<input name="username" autocomplete="username" required maxlength="80"></label><label>Mật khẩu<input name="password" type="password" autocomplete="current-password" required maxlength="256"></label><button class="primary" type="submit">Vào hệ thống →</button><p id="login-error" role="alert" class="error"></p><small>Bản nền tảng 0.1 · Cần nghiệm thu trước vận hành thực tế.</small></form>
+</section>
+<div id="workspace" class="workspace" hidden>
+  <aside><div class="wordmark">M<span>·</span>ES <small>OPERATIONS</small></div><p class="nav-label">ĐIỀU HÀNH</p><nav aria-label="Điều hướng chính"><button data-page="overview" class="active">◫ <span>Tổng quan</span></button><button data-page="orders">▤ <span>Lệnh sản xuất</span></button><button data-page="lots">▦ <span>Nguyên vật liệu</span></button><button data-page="routes">⇄ <span>Quy trình & BOM</span></button><button data-page="audit">◷ <span>Nhật ký hoạt động</span></button></nav><div class="aside-footer"><span class="status-dot"></span> MES Foundation <small>Discrete manufacturing · v0.1</small></div></aside>
+  <div class="main"><header><div><span class="header-label">NHÀ MÁY</span><select id="plant-select" aria-label="Chọn nhà máy"></select></div><div class="account"><span id="user-label"></span><button id="logout" class="quiet">Đăng xuất</button></div></header><div class="notice">Bản nền tảng để kiểm thử và nghiệm thu • Chưa kết nối ERP hoặc thiết bị sản xuất</div><main id="content" tabindex="-1"></main></div>
+</div>
+<dialog id="dialog"><div class="dialog-head"><h2 id="dialog-title"></h2><button id="close-dialog" class="quiet" aria-label="Đóng">✕</button></div><div id="dialog-body"></div></dialog><div id="toast" role="status" hidden></div>
+</body></html>
