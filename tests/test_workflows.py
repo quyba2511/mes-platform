@@ -1,16 +1,17 @@
 import uuid
 import os
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, func, select, text
+from sqlalchemy import create_engine, event, func, inspect, select, text
 from sqlalchemy.exc import DatabaseError
 from sqlalchemy.orm import Session
 
 from app.db import make_engine
-from app.main import create_app
+from app.main import create_app, order_data
 from app.manage import initialize, seed_demo
-from app.models import Audit, Consumption, Grant, Lot, Outbox, Route, User, WorkOrder
+from app.models import Audit, Consumption, Grant, Lot, Operation, Outbox, Route, User, WorkOrder
 from app.security import hash_password
 
 @pytest.fixture
@@ -241,3 +242,116 @@ def test_health_and_security_headers(env):
     assert client.get('/').status_code==200
     assert "frame-ancestors 'none'" in client.get('/').headers['content-security-policy']
     assert client.get('/api/plants').headers['cache-control']=='no-store'
+
+
+def get_orders_with_queries(client, engine):
+    statements = []
+
+    def capture(connection, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    event.listen(engine, 'before_cursor_execute', capture)
+    try:
+        response = client.get('/api/plants/1/orders')
+    finally:
+        event.remove(engine, 'before_cursor_execute', capture)
+    assert response.status_code == 200, response.text
+    return response.json(), statements
+
+
+def test_orders_query_count_is_constant(env):
+    client, engine = env
+    counts = []
+    created = 0
+    # Include another plant's operations to catch missing plant/order scoping.
+    assert create_order(client, code='OTHER-PLANT', plant=2, route=2).status_code == 201
+    for size in (3, 10):
+        while created < size:
+            created += 1
+            assert create_order(client, code=f'COUNT-{created}').status_code == 201
+        # The original per-order serializer provides the full pre-change response,
+        # outside the measured request (including database timestamp formatting).
+        with Session(engine) as db:
+            expected = [order_data(db, order) for order in db.scalars(
+                select(WorkOrder).where(WorkOrder.plant_id == 1).order_by(WorkOrder.id.desc()).limit(500))]
+        payload, statements = get_orders_with_queries(client, engine)
+        counts.append(len(statements))
+        assert payload == expected
+        assert len(payload) == size
+        assert all(len(order['operations']) == 3 for order in payload)
+        assert len({op['id'] for order in payload for op in order['operations']}) == size * 3
+        data_queries = [sql for sql in statements if 'FROM work_orders' in sql or 'FROM operations' in sql]
+        assert len(data_queries) == 2
+    # Four unchanged queries authenticate the session/user and check grant/plant;
+    # only two queries fetch orders and operations, regardless of result count.
+    assert counts[0] == counts[1]
+    assert max(counts) <= 6
+
+
+def test_empty_orders_skip_operation_query(env):
+    client, engine = env
+    payload, statements = get_orders_with_queries(client, engine)
+    assert payload == []
+    assert len(statements) <= 5
+    assert not any('FROM operations' in sql for sql in statements)
+
+
+def test_order_without_operations_does_not_fall_back_to_per_order_query(env):
+    client, engine = env
+    with Session(engine) as db, db.begin():
+        db.add(WorkOrder(plant_id=1, code='NO-OPERATIONS', route_id=1,
+                         product='ASM-100', revision=1, planned_qty=10))
+    payload, statements = get_orders_with_queries(client, engine)
+    assert len(payload) == 1 and payload[0]['operations'] == []
+    assert sum('FROM operations' in sql for sql in statements) == 1
+    assert len(statements) <= 6
+
+
+def test_orders_preserve_limit_and_operation_sequence(env):
+    client, engine = env
+    with Session(engine) as db, db.begin():
+        for index in range(501):
+            order = WorkOrder(plant_id=1, code=f'PAGE-{index}', route_id=1,
+                              product='ASM-100', revision=1, planned_qty=10)
+            db.add(order)
+            db.flush()
+            # Deliberately insert out of sequence so ordering is observable.
+            for sequence in (3, 1, 2):
+                db.add(Operation(order_id=order.id, sequence=sequence,
+                                 name=f'{order.code}-STEP-{sequence}', work_center='CNC-01'))
+    payload, statements = get_orders_with_queries(client, engine)
+    assert len(payload) == 500
+    assert [order['code'] for order in payload] == [f'PAGE-{index}' for index in range(500, 0, -1)]
+    for order in payload:
+        assert [op['sequence'] for op in order['operations']] == [1, 2, 3]
+        assert [op['name'] for op in order['operations']] == [f'{order["code"]}-STEP-{i}' for i in (1, 2, 3)]
+    assert len(statements) <= 6
+
+
+def test_query_indexes_and_reversible_migration(env):
+    _, engine = env
+    expected = {
+        'audit_events': ('ix_audit_events_plant_entity_entity_id', ['plant_id', 'entity', 'entity_id']),
+        'consumptions': ('ix_consumptions_lot_id', ['lot_id']),
+    }
+
+    def assert_indexes_present():
+        for table, (name, columns) in expected.items():
+            indexes = {index['name']: index['column_names'] for index in inspect(engine).get_indexes(table)}
+            assert indexes[name] == columns
+
+    def migrate(direction):
+        script = Path(__file__).parents[1] / 'migrations' / f'001_query_indexes.{direction}.sql'
+        with engine.begin() as connection:
+            for statement in script.read_text().split(';'):
+                if statement.strip():
+                    connection.exec_driver_sql(statement)
+
+    assert_indexes_present()  # Fresh databases get indexes from ORM metadata.
+    migrate('down')
+    migrate('down')  # Downgrade is idempotent too.
+    for table, (name, _) in expected.items():
+        assert name not in {index['name'] for index in inspect(engine).get_indexes(table)}
+    migrate('up')
+    migrate('up')
+    assert_indexes_present()

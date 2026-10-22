@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, ForeignKey, Integer, JSON, String, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, JSON, String, UniqueConstraint
 from .db import Base
 
 def now():
@@ -101,7 +101,7 @@ class Consumption(Base):
     __tablename__ = "consumptions"
     id = Column(Integer, primary_key=True)
     order_id = Column(ForeignKey("work_orders.id"), nullable=False, index=True)
-    lot_id = Column(ForeignKey("material_lots.id"), nullable=False)
+    lot_id = Column(ForeignKey("material_lots.id"), nullable=False, index=True)
     quantity = Column(Integer, nullable=False)
     __table_args__ = (UniqueConstraint("order_id", "lot_id"), CheckConstraint("quantity > 0"))
 
@@ -115,6 +115,7 @@ class Audit(Base):
     entity_id = Column(Integer, nullable=False)
     payload = Column(JSON, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, default=now)
+    __table_args__ = (Index("ix_audit_events_plant_entity_entity_id", "plant_id", "entity", "entity_id"),)
 
 class Command(Base):
     __tablename__ = "commands"

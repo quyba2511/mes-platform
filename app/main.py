@@ -26,8 +26,9 @@ def audit(db, user, plant, action, entity, entity_id, payload):
     db.add(Audit(plant_id=plant, actor_id=user.id, action=action, entity=entity, entity_id=entity_id, payload=payload))
     db.add(Outbox(plant_id=plant, topic=action, payload={"entity": entity, "entity_id": entity_id, **payload}))
 
-def order_data(db, order):
-    operations = db.scalars(select(Operation).where(Operation.order_id == order.id).order_by(Operation.sequence)).all()
+def order_data(db, order, operations=None):
+    if operations is None:
+        operations = db.scalars(select(Operation).where(Operation.order_id == order.id).order_by(Operation.sequence)).all()
     return {"id": order.id, "plant_id": order.plant_id, "code": order.code, "product": order.product,
             "revision": order.revision, "planned_qty": order.planned_qty, "state": order.state,
             "quality": order.quality, "hold_reason": order.hold_reason, "version": order.version,
@@ -201,7 +202,14 @@ def create_app(engine=None):
     @app.get("/api/plants/{plant_id}/orders")
     def orders(plant_id: int, user=Depends(current_user, scope="function"), db=Depends(db_session, scope="function")):
         access(db, user, plant_id)
-        return [order_data(db, o) for o in db.scalars(select(WorkOrder).where(WorkOrder.plant_id == plant_id).order_by(WorkOrder.id.desc()).limit(500))]
+        orders = db.scalars(select(WorkOrder).where(WorkOrder.plant_id == plant_id).order_by(WorkOrder.id.desc()).limit(500)).all()
+        if not orders:
+            return []
+        operations_by_order = {order.id: [] for order in orders}
+        operations = db.scalars(select(Operation).where(Operation.order_id.in_(operations_by_order)).order_by(Operation.sequence))
+        for operation in operations:
+            operations_by_order[operation.order_id].append(operation)
+        return [order_data(db, order, operations_by_order[order.id]) for order in orders]
 
     @app.post("/api/plants/{plant_id}/orders", status_code=201)
     def add_order(plant_id: int, data: OrderInput, request: Request, idempotency_key: str = Header(default=""), user=Depends(current_user, scope="function"), db=Depends(db_session, scope="function")):
