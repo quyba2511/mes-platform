@@ -1,14 +1,33 @@
 'use strict';
 /* MES Operations UI — vanilla JS, no external assets (CSP: default-src 'self').
-   Dynamic widths are applied through the CSSOM (applyWidths) because inline style attributes are blocked. */
+   UI strings live in i18n.js (MESSAGES). Dynamic widths are applied through the CSSOM (applyWidths)
+   because inline style attributes are blocked. */
 
 // ---------- helpers ----------
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmt = n => new Intl.NumberFormat('en-US').format(n ?? 0);
 const clamp = (v, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, v));
 const ratio = (a, b) => (b > 0 ? clamp((a / b) * 100) : 0);
+
+// ---------- i18n ----------
+const LANGS = ['en', 'zh-TW'];
+const LOCALES = {en: {number: 'en-US', date: 'en-GB'}, 'zh-TW': {number: 'zh-TW', date: 'zh-TW'}};
+function initialLang() {
+  try { const saved = localStorage.getItem('mes-lang'); if (LANGS.includes(saved)) return saved; } catch { /* storage unavailable */ }
+  return (navigator.languages || [navigator.language]).some(l => /^zh/i.test(l || '')) ? 'zh-TW' : 'en';
+}
+let lang = initialLang();
+const hasKey = key => key in MESSAGES.en;
+/* Translate a key. String params are HTML-escaped, so pass raw values; message templates may contain trusted markup. */
+function t(key, params = {}) {
+  const msg = MESSAGES[lang]?.[key] ?? MESSAGES.en[key] ?? key;
+  const safe = {};
+  for (const [k, v] of Object.entries(params)) safe[k] = typeof v === 'string' ? esc(v) : v;
+  if (typeof msg === 'function') return msg(safe);
+  return msg.replace(/\{(\w+)\}/g, (m, k) => (k in safe ? String(safe[k]) : m));
+}
+const fmt = n => new Intl.NumberFormat(LOCALES[lang].number).format(n ?? 0);
 
 const ICONS = {
   overview: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
@@ -41,75 +60,67 @@ const ICONS = {
 };
 const icon = (name, cls = '') => `<svg class="icon ${cls}" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ''}</svg>`;
 
-const ORDER_LABELS = {queued:'Queued', draft:'Draft', released:'Released', in_progress:'In progress', on_hold:'On hold', completed:'Completed', pending:'QC pending', pass:'QC passed', fail:'QC failed'};
-const LOT_LABELS = {quarantine:'Quarantine', released:'Approved', rejected:'Rejected'};
-const ROLE_LABELS = {admin:'Administrator', planner:'Planner', operator:'Operator', quality:'Quality', viewer:'Viewer'};
 const TONES = {queued:'neutral', draft:'neutral', released:'info', in_progress:'violet', on_hold:'warn', completed:'ok', pending:'neutral', pass:'ok', fail:'bad', quarantine:'warn', rejected:'bad', approved:'ok'};
+const statusLabel = s => (hasKey(`status.${s}`) ? t(`status.${s}`) : s);
+const lotLabel = s => (hasKey(`lot.${s}`) ? t(`lot.${s}`) : s);
 const badge = (s, kind = 'order') => {
-  const label = (kind === 'lot' ? LOT_LABELS[s] : ORDER_LABELS[s]) || s;
+  const label = kind === 'lot' ? lotLabel(s) : statusLabel(s);
   const tone = kind === 'lot' && s === 'released' ? 'ok' : (TONES[s] || 'neutral');
   return `<span class="badge tone-${tone}"><span class="badge-dot" aria-hidden="true"></span>${esc(label)}</span>`;
 };
 const EVENTS = {
-  'order.created': ['Order created', 'plus', 'neutral', 'order'],
-  'order.release': ['Released with materials', 'play', 'info', 'order'],
-  'order.record': ['Output recorded', 'tool', 'violet', 'order'],
-  'order.hold': ['Order put on hold', 'pause', 'warn', 'order'],
-  'order.resume': ['Order resumed', 'play', 'info', 'order'],
-  'order.quality': ['Final inspection recorded', 'shield', 'ok', 'order'],
-  'order.complete': ['Order closed', 'flag', 'ok', 'order'],
-  'route.created': ['Route revision created', 'routes', 'neutral', 'route'],
-  'lot.received': ['Material lot received', 'inbox', 'neutral', 'lot'],
-  'lot.quality': ['Lot quality decision', 'shield', 'ok', 'lot'],
+  'order.created': ['plus', 'neutral'], 'order.release': ['play', 'info'], 'order.record': ['tool', 'violet'],
+  'order.hold': ['pause', 'warn'], 'order.resume': ['play', 'info'], 'order.quality': ['shield', 'ok'],
+  'order.complete': ['flag', 'ok'], 'route.created': ['routes', 'neutral'], 'lot.received': ['inbox', 'neutral'], 'lot.quality': ['shield', 'ok'],
 };
-const eventInfo = action => EVENTS[action] || [action, 'clock', 'neutral', 'other'];
-const ENTITY_LABELS = {order:'Order', lot:'Lot', route:'Route'};
+const eventInfo = action => [hasKey(`event.${action}`) ? t(`event.${action}`) : action, ...(EVENTS[action] || ['clock', 'neutral'])];
+const entityLabel = e => (hasKey(`entity.${e}`) ? t(`entity.${e}`) : e);
 
-// Backend messages are Vietnamese; show them in English.
-const ERRORS = {
-  'Vui lòng đăng nhập':'Please sign in.',
-  'Phiên không hợp lệ':'Your session is invalid. Please sign in again.',
-  'Phiên đã hết hạn':'Your session has expired. Please sign in again.',
-  'Tài khoản không hoạt động':'This account is inactive.',
-  'Không có quyền truy cập nhà máy':'You do not have access to this plant.',
-  'Không tìm thấy nhà máy':'Plant not found.',
-  'Vai trò không được phép thực hiện thao tác':'Your role is not allowed to perform this action.',
-  'Không tìm thấy lệnh':'Work order not found.',
-  'Cần Idempotency-Key từ 8 đến 80 ký tự':'Request key must be 8–80 characters.',
-  'Idempotency-Key đã dùng cho yêu cầu khác':'This request key was already used for a different request.',
-  'Thử đăng nhập quá nhiều. Vui lòng chờ 15 phút.':'Too many sign-in attempts. Please wait 15 minutes.',
-  'Tên đăng nhập hoặc mật khẩu không đúng':'Incorrect username or password.',
-  'Không tìm thấy lô':'Material lot not found.',
-  'Lô đã có quyết định chất lượng':'This lot already has a quality decision.',
-  'Lô đã được cập nhật; hãy tải lại':'This lot was updated by someone else. Refresh and try again.',
-  'Quy trình không thuộc nhà máy':'The route does not belong to this plant.',
-  'Lệnh đã thay đổi. Tải lại rồi thực hiện lại.':'The order was changed by someone else. Refresh and try again.',
-  'Lệnh đã đóng, không thể sửa':'The order is closed and can no longer be changed.',
-  'Chỉ phát hành lệnh nháp':'Only draft orders can be released.',
-  'Không được chọn lặp lô':'Each lot can only be selected once.',
-  'Lô không thuộc nhà máy':'The lot does not belong to this plant.',
-  'Vật tư không thuộc BOM':'This material is not part of the BOM.',
-  'Lô chưa được QC duyệt hoặc không đủ tồn kho':'Lot is not QC-approved or has insufficient stock.',
-  'Cấp vật tư phải đúng định mức BOM × số lượng kế hoạch':'Allocated quantities must equal BOM quantity × planned quantity.',
-  'Lệnh chưa sẵn sàng hoặc đang bị giữ':'The order is not released or is on hold.',
-  'Công đoạn không thuộc lệnh':'The operation does not belong to this order.',
-  'Công đoạn đã hoàn tất':'This operation is already finished.',
-  'Phải hoàn tất công đoạn trước':'Finish the previous operation first.',
-  'Chưa có sản lượng để ghi nhận':'Enter a good or scrap quantity to record.',
-  'Cần lý do phế phẩm':'A scrap reason is required.',
-  'Sản lượng vượt số lượng đầu vào':'Output exceeds the available input quantity.',
-  'Phải ghi nhận đủ số lượng đầu vào trước khi kết thúc công đoạn':'Record the full input quantity before finishing the operation.',
-  'Không thể giữ lệnh ở trạng thái này':'The order cannot be put on hold in its current state.',
-  'Cần lý do giữ lệnh':'A hold reason is required.',
-  'Lệnh không bị giữ':'The order is not on hold.',
-  'Cần lý do xử lý và cho chạy lại':'Describe the corrective action before resuming.',
-  'Chỉ kiểm tra cuối khi mọi công đoạn hoàn tất và lệnh không bị giữ':'Final inspection requires all operations finished and the order not on hold.',
-  'Cần kết quả và biên bản kiểm tra':'A decision and inspection notes are required.',
-  'Cần hoàn tất các công đoạn và QC đạt trước khi đóng':'All operations must be finished and QC passed before closing.',
-  'Cần lý do đóng lệnh thiếu sản lượng':'A reason is required to close an order short of its planned quantity.',
-  'Dữ liệu trùng hoặc xung đột. Tải lại trước khi thử lại.':'Duplicate or conflicting data (for example, a code that already exists). Refresh and try again.',
+// Backend messages are Vietnamese; show them in the selected UI language.
+const SERVER_ERRORS = {
+  'Vui lòng đăng nhập': 'signIn',
+  'Phiên không hợp lệ': 'sessionInvalid',
+  'Phiên đã hết hạn': 'sessionExpired',
+  'Tài khoản không hoạt động': 'inactive',
+  'Không có quyền truy cập nhà máy': 'noPlantAccess',
+  'Không tìm thấy nhà máy': 'plantNotFound',
+  'Vai trò không được phép thực hiện thao tác': 'roleNotAllowed',
+  'Không tìm thấy lệnh': 'orderNotFound',
+  'Cần Idempotency-Key từ 8 đến 80 ký tự': 'idemKeyLength',
+  'Idempotency-Key đã dùng cho yêu cầu khác': 'idemKeyReused',
+  'Thử đăng nhập quá nhiều. Vui lòng chờ 15 phút.': 'tooManyAttempts',
+  'Tên đăng nhập hoặc mật khẩu không đúng': 'badCredentials',
+  'Không tìm thấy lô': 'lotNotFound',
+  'Lô đã có quyết định chất lượng': 'lotDecided',
+  'Lô đã được cập nhật; hãy tải lại': 'lotChanged',
+  'Quy trình không thuộc nhà máy': 'routeWrongPlant',
+  'Lệnh đã thay đổi. Tải lại rồi thực hiện lại.': 'orderChanged',
+  'Lệnh đã đóng, không thể sửa': 'orderClosed',
+  'Chỉ phát hành lệnh nháp': 'releaseDraftOnly',
+  'Không được chọn lặp lô': 'duplicateLot',
+  'Lô không thuộc nhà máy': 'lotWrongPlant',
+  'Vật tư không thuộc BOM': 'materialNotInBom',
+  'Lô chưa được QC duyệt hoặc không đủ tồn kho': 'lotNotAvailable',
+  'Cấp vật tư phải đúng định mức BOM × số lượng kế hoạch': 'allocationMismatch',
+  'Lệnh chưa sẵn sàng hoặc đang bị giữ': 'orderNotRunnable',
+  'Công đoạn không thuộc lệnh': 'operationWrongOrder',
+  'Công đoạn đã hoàn tất': 'operationDone',
+  'Phải hoàn tất công đoạn trước': 'previousOperation',
+  'Chưa có sản lượng để ghi nhận': 'nothingToRecord',
+  'Cần lý do phế phẩm': 'scrapReason',
+  'Sản lượng vượt số lượng đầu vào': 'outputExceedsInput',
+  'Phải ghi nhận đủ số lượng đầu vào trước khi kết thúc công đoạn': 'finishNeedsFullInput',
+  'Không thể giữ lệnh ở trạng thái này': 'cannotHold',
+  'Cần lý do giữ lệnh': 'holdReason',
+  'Lệnh không bị giữ': 'notOnHold',
+  'Cần lý do xử lý và cho chạy lại': 'resumeReason',
+  'Chỉ kiểm tra cuối khi mọi công đoạn hoàn tất và lệnh không bị giữ': 'qcNotReady',
+  'Cần kết quả và biên bản kiểm tra': 'qcReason',
+  'Cần hoàn tất các công đoạn và QC đạt trước khi đóng': 'closeNotReady',
+  'Cần lý do đóng lệnh thiếu sản lượng': 'closeShortReason',
+  'Dữ liệu trùng hoặc xung đột. Tải lại trước khi thử lại.': 'conflict',
 };
-const translate = msg => ERRORS[String(msg).trim()] || msg;
+const translate = msg => (SERVER_ERRORS[String(msg).trim()] ? t(`err.${SERVER_ERRORS[String(msg).trim()]}`) : msg);
 
 // ---------- state ----------
 const state = {
@@ -120,31 +131,26 @@ const state = {
 let loadGeneration = 0;
 const can = (...roles) => state.plant?.role === 'admin' || roles.includes(state.plant?.role);
 const base = () => `/api/plants/${state.plant.id}`;
-const NAV = [
-  {page: 'overview', label: 'Overview', short: 'Overview', icon: 'overview'},
-  {page: 'orders', label: 'Work orders', short: 'Orders', icon: 'orders'},
-  {page: 'lots', label: 'Materials', short: 'Materials', icon: 'lots'},
-  {page: 'routes', label: 'Routes & BOM', short: 'Routes', icon: 'routes'},
-  {page: 'audit', label: 'Activity log', short: 'Activity', icon: 'audit'},
-];
+const NAV = [['overview', 'overview'], ['orders', 'orders'], ['lots', 'lots'], ['routes', 'routes'], ['audit', 'audit']];
 
 // ---------- time ----------
 const parseTime = v => new Date(/(?:Z|[+-]\d\d:\d\d)$/.test(v) ? v : v + 'Z');
 const tz = () => state.plant?.timezone || 'UTC';
-const time = v => new Intl.DateTimeFormat('en-GB', {day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: tz()}).format(parseTime(v));
-const clock = v => new Intl.DateTimeFormat('en-GB', {hour: '2-digit', minute: '2-digit', timeZone: tz()}).format(parseTime(v));
+const dateLocale = () => LOCALES[lang].date;
+const time = v => new Intl.DateTimeFormat(dateLocale(), {year: 'numeric', month: lang === 'en' ? 'short' : '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: tz()}).format(parseTime(v));
+const clock = v => new Intl.DateTimeFormat(dateLocale(), {hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: tz()}).format(parseTime(v));
 const dayKey = d => new Intl.DateTimeFormat('en-CA', {year: 'numeric', month: '2-digit', day: '2-digit', timeZone: tz()}).format(d);
 function dayLabel(v) {
-  const d = parseTime(v), key = dayKey(d), today = dayKey(new Date()), yest = dayKey(new Date(Date.now() - 864e5));
-  if (key === today) return 'Today';
-  if (key === yest) return 'Yesterday';
-  return new Intl.DateTimeFormat('en-GB', {weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: tz()}).format(d);
+  const d = parseTime(v), key = dayKey(d);
+  if (key === dayKey(new Date())) return t('time.today');
+  if (key === dayKey(new Date(Date.now() - 864e5))) return t('time.yesterday');
+  return new Intl.DateTimeFormat(dateLocale(), {weekday: 'short', day: 'numeric', month: lang === 'en' ? 'short' : 'long', year: 'numeric', timeZone: tz()}).format(d);
 }
 function relative(v) {
   const s = (Date.now() - parseTime(v).getTime()) / 1000;
-  if (s < 60) return 'just now';
-  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+  if (s < 60) return t('time.justNow');
+  if (s < 3600) return t('time.minutesAgo', {n: Math.floor(s / 60)});
+  if (s < 86400) return t('time.hoursAgo', {n: Math.floor(s / 3600)});
   return time(v);
 }
 
@@ -153,14 +159,14 @@ async function api(path, options = {}) {
   const headers = {'Content-Type': 'application/json', ...(state.token ? {Authorization: `Bearer ${state.token}`} : {}), ...options.headers};
   let response;
   try { response = await fetch(path, {...options, headers}); }
-  catch { throw new Error('Cannot reach the server. Check your connection and try again.'); }
+  catch { throw new Error(t('err.network')); }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     if (response.status === 401 && path !== '/api/login') logoutLocal();
     const detail = Array.isArray(data.detail)
       ? data.detail.map(x => `${(x.loc || []).slice(1).join('.') || 'input'}: ${x.msg}`).join('; ')
       : translate(data.detail);
-    throw new Error(detail || `Request failed (${response.status}).`);
+    throw new Error(detail || t('err.status', {status: response.status}));
   }
   return data;
 }
@@ -187,18 +193,20 @@ function phaseOf(o) {
 }
 const scrapOf = o => o.operations.reduce((s, op) => s + op.scrap, 0);
 // Show the QC result only once inspection is relevant; before that "pending" is just noise.
-const qualityBadge = o => (o.quality !== 'pending' || phaseOf(o) === 'qc' ? badge(o.quality) : '<span class="muted-dash" aria-label="Not inspected yet">—</span>');
+// Operations use their own wording ("finished" vs an order being "closed").
+const opBadge = st => `<span class="badge tone-${TONES[st] || 'neutral'}"><span class="badge-dot" aria-hidden="true"></span>${esc(t(`opStatus.${st}`))}</span>`;
+const qualityBadge = o => (o.quality !== 'pending' || phaseOf(o) === 'qc' ? badge(o.quality) : `<span class="muted-dash" aria-label="${t('orders.notInspected')}">—</span>`);
 
 // ---------- ui primitives ----------
 function applyWidths(root = document) { $$('[data-w]', root).forEach(el => { el.style.width = `${clamp(Number(el.dataset.w) || 0)}%`; }); }
-const bar = (pct, tone = 'info', label = '') => `<span class="bar" role="img" aria-label="${esc(label || `${Math.round(pct)}%`)}"><span class="bar-fill tone-${tone}" data-w="${pct}"></span></span>`;
+const bar = (pct, tone = 'info', label = '') => `<span class="bar" role="img" aria-label="${label || `${Math.round(pct)}%`}"><span class="bar-fill tone-${tone}" data-w="${pct}"></span></span>`;
 const btn = (label, attrs = '', cls = 'btn-secondary', ic = '') => `<button type="button" class="btn ${cls}" ${attrs}>${ic ? icon(ic) : ''}<span>${label}</span></button>`;
 const empty = (title, text = '', action = '', ic = 'inbox') => `<div class="empty">${icon(ic, 'empty-icon')}<p class="empty-title">${title}</p>${text ? `<p class="empty-text">${text}</p>` : ''}${action}</div>`;
-function pageHead(title, subtitle = '', actions = '', eyebrow = null) {
-  const eb = eyebrow ?? `${esc(state.plant.code)} · ${esc(state.plant.name)}`;
-  return `<div class="page-head"><div class="page-title"><p class="eyebrow">${eb}</p><h1>${title}</h1>${subtitle ? `<p class="subtitle">${subtitle}</p>` : ''}</div>${actions ? `<div class="page-actions">${actions}</div>` : ''}</div>`;
+function pageHead(title, subtitle = '', actions = '') {
+  return `<div class="page-head"><div class="page-title"><p class="eyebrow">${esc(state.plant.code)} · ${esc(state.plant.name)}</p><h1>${title}</h1>${subtitle ? `<p class="subtitle">${subtitle}</p>` : ''}</div>${actions ? `<div class="page-actions">${actions}</div>` : ''}</div>`;
 }
 const panel = (title, body, extra = '', cls = '') => `<section class="panel ${cls}"><div class="panel-head"><h2>${title}</h2>${extra}</div>${body}</section>`;
+const newOrderBtn = () => (can('planner') ? btn(t('orders.new'), 'data-cmd="new-order"', 'btn-primary', 'plus') : '');
 let toastTimer;
 function toast(message, tone = 'ok') {
   const el = $('#toast');
@@ -209,26 +217,60 @@ function toast(message, tone = 'ok') {
 }
 function setLoading(on) { $('#loading-bar').hidden = !on; }
 
-// ---------- theme ----------
+// ---------- static text, language & theme ----------
+function applyStatic() {
+  document.documentElement.lang = lang;
+  document.title = t('app.title');
+  $$('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  $$('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+  $$('[data-i18n-attr]').forEach(el => el.dataset.i18nAttr.split(';').forEach(pair => {
+    const [attr, key] = pair.split(':');
+    el.setAttribute(attr, t(key));
+  }));
+  $$('.lang-select').forEach(s => { s.value = lang; });
+}
+function setLang(next) {
+  if (!LANGS.includes(next) || next === lang) { $$('.lang-select').forEach(s => { s.value = lang; }); return; }
+  lang = next;
+  try { localStorage.setItem('mes-lang', lang); } catch { /* storage unavailable */ }
+  if ($('#dialog').open) $('#dialog').close();
+  $('#login-error').textContent = '';
+  applyStatic(); renderNav(); applyTheme(document.documentElement.dataset.theme);
+  if (!$('#workspace').hidden) {
+    if (!state.plant) renderNoPlant();
+    else if (state.loadedPlant === state.plant.id) render();
+    else updateChrome();
+  }
+}
+document.addEventListener('change', event => { if (event.target.matches('.lang-select')) setLang(event.target.value); });
+// The top-bar selector uses short labels on phones so the plant picker keeps its room.
+const narrow = matchMedia('(max-width: 760px)');
+function syncLangLabels() {
+  const labels = narrow.matches ? {en: 'EN', 'zh-TW': '中文'} : {en: 'English', 'zh-TW': '繁體中文'};
+  $$('.topbar .lang-select option').forEach(o => { o.textContent = labels[o.value]; });
+}
+narrow.addEventListener('change', syncLangLabels);
+
 function storedTheme() { try { return localStorage.getItem('mes-theme'); } catch { return null; } }
 function effectiveTheme() { return document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); }
 function applyTheme(theme) {
   if (theme) document.documentElement.dataset.theme = theme; else delete document.documentElement.dataset.theme;
   const dark = effectiveTheme() === 'dark';
   $('#theme-toggle').innerHTML = icon(dark ? 'sun' : 'moon');
-  $('#theme-toggle').setAttribute('aria-label', dark ? 'Switch to light theme' : 'Switch to dark theme');
-  $('#theme-toggle').title = dark ? 'Light theme' : 'Dark theme';
+  $('#theme-toggle').setAttribute('aria-label', t(dark ? 'theme.toLight' : 'theme.toDark'));
+  $('#theme-toggle').title = t(dark ? 'theme.light' : 'theme.dark');
 }
 $('#theme-toggle').onclick = () => {
   const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
   try { localStorage.setItem('mes-theme', next); } catch { /* storage unavailable */ }
   applyTheme(next);
 };
-applyTheme(storedTheme());
 
 // ---------- shell ----------
-$('#nav').innerHTML = NAV.map(n => `<button type="button" class="nav-item" data-cmd="go" data-page="${n.page}" aria-label="${n.label}" title="${n.label}">${icon(n.icon)}<span class="nav-label">${n.label}</span><span class="nav-short">${n.short}</span><span class="nav-count" data-count="${n.page}" hidden></span></button>`).join('');
-
+function renderNav() {
+  $('#nav').innerHTML = NAV.map(([page, ic]) => `<button type="button" class="nav-item" data-cmd="go" data-page="${page}" aria-label="${t(`nav.${page}`)}" title="${t(`nav.${page}`)}">${icon(ic)}<span class="nav-label">${t(`nav.${page}`)}</span><span class="nav-short">${t(`nav.${page}.short`)}</span><span class="nav-count" data-count="${page}" hidden></span></button>`).join('');
+  updateChrome();
+}
 function updateChrome() {
   $$('.nav-item').forEach(b => {
     const active = b.dataset.page === state.page;
@@ -243,11 +285,12 @@ function updateChrome() {
   setCount('lots', state.lots.filter(l => l.quality === 'quarantine').length, 'warn');
   if (state.plant) {
     $('#user-name').textContent = state.username;
-    $('#user-role').textContent = ROLE_LABELS[state.plant.role] || state.plant.role;
+    $('#user-role').textContent = hasKey(`role.${state.plant.role}`) ? t(`role.${state.plant.role}`) : state.plant.role;
     $('#user-avatar').textContent = (state.username || '?').slice(0, 2).toUpperCase();
     $('#plant-select').value = String(state.plant.id);
   }
 }
+function renderNoPlant() { $('#content').innerHTML = empty(t('shell.noPlant.title'), t('shell.noPlant.text'), '', 'alert'); }
 
 function logoutLocal() {
   state.token = null; loadGeneration++;
@@ -263,16 +306,13 @@ $('#login-form').onsubmit = async event => {
   const form = event.target, button = $('button[type=submit]', form);
   button.disabled = true; button.classList.add('is-busy'); $('#login-error').textContent = '';
   try {
-    const data = await post('/api/login', Object.fromEntries(new FormData(form)));
+    const data = await post('/api/login', {username: form.username.value, password: form.password.value});
     state.token = data.token; state.username = data.username;
     state.plants = await api('/api/plants');
     $('#plant-select').innerHTML = state.plants.map(p => `<option value="${p.id}">${esc(p.code)} · ${esc(p.name)}</option>`).join('');
     state.plant = state.plants[0] || null; state.page = 'overview'; state.detail = null;
     $('#login-screen').hidden = true; $('#workspace').hidden = false; form.reset();
-    if (!state.plant) {
-      $('#content').innerHTML = empty('No plant access yet', 'Your account has not been granted access to any plant. Contact your administrator.', '', 'alert');
-      return;
-    }
+    if (!state.plant) { renderNoPlant(); return; }
     updateChrome();
     await load();
     $('#content').focus();
@@ -289,7 +329,7 @@ $('#close-dialog').onclick = () => $('#dialog').close();
 
 // ---------- loading ----------
 function skeleton() {
-  return `<div class="skeleton-page" aria-busy="true" aria-label="Loading plant data"><div class="sk sk-title"></div><div class="kpis">${'<div class="sk sk-card"></div>'.repeat(4)}</div><div class="sk sk-panel"></div></div>`;
+  return `<div class="skeleton-page" aria-busy="true" aria-label="${t('shell.loading')}"><div class="sk sk-title"></div><div class="kpis">${'<div class="sk sk-card"></div>'.repeat(4)}</div><div class="sk sk-panel"></div></div>`;
 }
 async function load() {
   if (!state.plant) return;
@@ -304,7 +344,7 @@ async function load() {
     render();
   } catch (error) {
     if (generation !== loadGeneration) return;
-    if (switching) $('#content').innerHTML = `<div class="callout tone-bad">${icon('alert')}<div><strong>Could not load plant data</strong><p>${esc(error.message)}</p></div>${btn('Try again', 'data-cmd="refresh"')}</div>`;
+    if (switching) $('#content').innerHTML = `<div class="callout tone-bad">${icon('alert')}<div><strong>${t('shell.loadFailed')}</strong><p>${esc(error.message)}</p></div>${btn(t('common.tryAgain'), 'data-cmd="refresh"')}</div>`;
     else toast(error.message, 'bad');
   } finally { if (generation === loadGeneration) setLoading(false); }
 }
@@ -378,95 +418,94 @@ function renderOverview() {
 
   const kpi = (label, value, foot, ic, tone = '') => `<div class="kpi ${tone ? `kpi-${tone}` : ''}"><div class="kpi-top"><span class="kpi-label">${label}</span><span class="kpi-icon">${icon(ic)}</span></div><div class="kpi-value">${value}</div><div class="kpi-foot">${foot}</div></div>`;
   const kpis = `<div class="kpis">
-    ${kpi('Active orders', fmt(active.length), `${fmt(by('in_progress').length)} in progress · ${fmt(by('released').length)} released`, 'orders', 'accent')}
-    ${kpi('Good units closed', fmt(goodOut), plannedClosed ? `${ratio(goodOut, plannedClosed).toFixed(1)}% of planned on ${fmt(closed.length)} closed orders` : 'No closed orders yet', 'box')}
-    ${kpi('Scrap rate', scrapRate === null ? '—' : `${scrapRate.toFixed(1)}%`, `${fmt(scrap)} scrap in ${fmt(good + scrap)} pcs processed (all operations)`, 'gauge', scrapRate > 5 ? 'warn' : '')}
-    ${kpi('On hold', fmt(held.length), held.length ? 'Needs a quality decision' : 'Nothing blocked', 'pause', held.length ? 'warn' : '')}
+    ${kpi(t('kpi.active'), fmt(active.length), t('kpi.active.foot', {running: fmt(by('in_progress').length), released: fmt(by('released').length)}), 'orders', 'accent')}
+    ${kpi(t('kpi.good'), fmt(goodOut), plannedClosed ? t('kpi.good.foot', {pct: ratio(goodOut, plannedClosed).toFixed(1), n: closed.length}) : t('kpi.good.none'), 'box')}
+    ${kpi(t('kpi.scrap'), scrapRate === null ? '—' : `${scrapRate.toFixed(1)}%`, t('kpi.scrap.foot', {scrap: fmt(scrap), total: fmt(good + scrap)}), 'gauge', scrapRate > 5 ? 'warn' : '')}
+    ${kpi(t('kpi.hold'), fmt(held.length), held.length ? t('kpi.hold.some') : t('kpi.hold.none'), 'pause', held.length ? 'warn' : '')}
   </div>`;
 
   // status distribution
   const states = ['draft', 'released', 'in_progress', 'on_hold', 'completed'];
   const counts = states.map(s => [s, by(s).length]);
   const statusBody = orders.length
-    ? `<div class="panel-body"><div class="stack" role="img" aria-label="Orders by status">${counts.filter(([, n]) => n).map(([s, n]) => `<span class="stack-seg tone-${TONES[s]}" data-w="${(n / orders.length) * 100}" title="${ORDER_LABELS[s]}: ${n}"></span>`).join('')}</div>
-       <ul class="legend">${counts.map(([s, n]) => `<li><button type="button" class="legend-item" data-cmd="go" data-page="orders" data-state="${s}"><span class="legend-swatch tone-${TONES[s]}"></span><span>${ORDER_LABELS[s]}</span><strong>${fmt(n)}</strong><small>${orders.length ? Math.round((n / orders.length) * 100) : 0}%</small></button></li>`).join('')}</ul></div>`
-    : empty('No work orders yet', 'Create an order from a configured route to start production.', can('planner') ? btn('New order', 'data-cmd="new-order"', 'btn-primary', 'plus') : '');
+    ? `<div class="panel-body"><div class="stack" role="img" aria-label="${t('overview.byStatus')}">${counts.filter(([, n]) => n).map(([s, n]) => `<span class="stack-seg tone-${TONES[s]}" data-w="${(n / orders.length) * 100}" title="${statusLabel(s)}: ${n}"></span>`).join('')}</div>
+       <ul class="legend">${counts.map(([s, n]) => `<li><button type="button" class="legend-item" data-cmd="go" data-page="orders" data-state="${s}"><span class="legend-swatch tone-${TONES[s]}"></span><span>${statusLabel(s)}</span><strong>${fmt(n)}</strong><small>${orders.length ? Math.round((n / orders.length) * 100) : 0}%</small></button></li>`).join('')}</ul></div>`
+    : empty(t('orders.empty.title'), t('orders.empty.text'), newOrderBtn());
 
   // needs attention
   const attn = [];
-  held.forEach(o => attn.push({tone: 'warn', ic: 'pause', title: `${o.code} is on hold`, text: o.hold_reason || 'Awaiting a quality decision', cmd: `data-cmd="open-order" data-id="${o.id}"`}));
-  awaitingQC.forEach(o => attn.push({tone: 'info', ic: 'shield', title: `${o.code} awaits final inspection`, text: `All ${o.operations.length} operations finished`, cmd: `data-cmd="open-order" data-id="${o.id}"`}));
-  readyClose.forEach(o => attn.push({tone: 'ok', ic: 'flag', title: `${o.code} is ready to close`, text: `QC passed · ${fmt(lastGood(o))} good pcs`, cmd: `data-cmd="open-order" data-id="${o.id}"`}));
-  drafts.slice(0, 3).forEach(o => attn.push({tone: 'neutral', ic: 'play', title: `${o.code} is waiting for release`, text: `${esc(o.product)} · ${fmt(o.planned_qty)} pcs planned`, cmd: `data-cmd="open-order" data-id="${o.id}"`}));
-  if (quarantine.length) attn.push({tone: 'warn', ic: 'lots', title: `${quarantine.length} material lot${quarantine.length > 1 ? 's' : ''} in quarantine`, text: 'Approve or reject before they can be issued', cmd: 'data-cmd="go" data-page="lots" data-filter="quarantine"'});
+  held.forEach(o => attn.push({tone: 'warn', ic: 'pause', title: t('attn.hold', {code: o.code}), text: o.hold_reason ? esc(o.hold_reason) : t('attn.hold.text'), cmd: `data-cmd="open-order" data-id="${o.id}"`}));
+  awaitingQC.forEach(o => attn.push({tone: 'info', ic: 'shield', title: t('attn.qc', {code: o.code}), text: t('attn.qc.text', {n: o.operations.length}), cmd: `data-cmd="open-order" data-id="${o.id}"`}));
+  readyClose.forEach(o => attn.push({tone: 'ok', ic: 'flag', title: t('attn.close', {code: o.code}), text: t('attn.close.text', {good: fmt(lastGood(o))}), cmd: `data-cmd="open-order" data-id="${o.id}"`}));
+  drafts.slice(0, 3).forEach(o => attn.push({tone: 'neutral', ic: 'play', title: t('attn.draft', {code: o.code}), text: t('attn.draft.text', {product: o.product, qty: fmt(o.planned_qty)}), cmd: `data-cmd="open-order" data-id="${o.id}"`}));
+  if (quarantine.length) attn.push({tone: 'warn', ic: 'lots', title: t('attn.quarantine', {n: quarantine.length}), text: t('attn.quarantine.text'), cmd: 'data-cmd="go" data-page="lots" data-filter="quarantine"'});
   const attnBody = attn.length
-    ? `<ul class="attn-list">${attn.slice(0, 7).map(a => `<li><button type="button" class="attn-item" ${a.cmd}><span class="attn-icon tone-${a.tone}">${icon(a.ic)}</span><span class="attn-text"><strong>${esc(a.title)}</strong><small>${esc(a.text)}</small></span>${icon('chevR', 'chev')}</button></li>`).join('')}</ul>`
-    : empty('All clear', 'No orders or lots need action right now.', '', 'check');
+    ? `<ul class="attn-list">${attn.slice(0, 7).map(a => `<li><button type="button" class="attn-item" ${a.cmd}><span class="attn-icon tone-${a.tone}">${icon(a.ic)}</span><span class="attn-text"><strong>${a.title}</strong><small>${a.text}</small></span>${icon('chevR', 'chev')}</button></li>`).join('')}</ul>`
+    : empty(t('attn.clear.title'), t('attn.clear.text'), '', 'check');
 
   // WIP
   const wip = active.slice(0, 6);
   const wipBody = wip.length
     ? `<ul class="wip-list">${wip.map(o => {
         const i = currentOpIndex(o), op = o.operations[i], p = orderProgress(o);
-        const where = op ? `${esc(op.name)} · ${esc(op.work_center)}` : 'All operations finished';
-        return `<li><button type="button" class="wip-item" data-cmd="open-order" data-id="${o.id}"><span class="wip-main"><strong>${esc(o.code)}</strong><small>${esc(o.product)} · ${where}</small></span><span class="wip-progress">${bar(p, 'violet', `${Math.round(p)}% complete`)}<small>Op ${Math.max(i, 0) + (op ? 1 : o.operations.length)} of ${o.operations.length} · ${Math.round(p)}%</small></span>${badge(o.state)}</button></li>`;
+        const where = op ? `${esc(op.name)} · ${esc(op.work_center)}` : t('wip.allDone');
+        const step = op ? i + 1 : o.operations.length;
+        return `<li><button type="button" class="wip-item" data-cmd="open-order" data-id="${o.id}"><span class="wip-main"><strong>${esc(o.code)}</strong><small>${esc(o.product)} · ${where}</small></span><span class="wip-progress">${bar(p, 'violet', t('wip.complete', {pct: Math.round(p)}))}<small>${t('wip.step', {step, total: o.operations.length, pct: Math.round(p)})}</small></span>${badge(o.state)}</button></li>`;
       }).join('')}</ul>`
-    : empty('Nothing in production', 'Released and in-progress orders appear here.', '', 'tool');
+    : empty(t('wip.empty.title'), t('wip.empty.text'), '', 'tool');
 
   // material availability
   const mats = {};
   state.lots.forEach(l => {
-    const m = mats[l.material] ||= {approved: 0, quarantine: 0, lots: 0};
-    m.lots++;
+    const m = mats[l.material] ||= {approved: 0, quarantine: 0};
     if (l.quality === 'released') m.approved += l.available;
     if (l.quality === 'quarantine') m.quarantine += l.available;
   });
   const matRows = Object.entries(mats).sort((a, b) => a[0].localeCompare(b[0]));
   const maxMat = Math.max(1, ...matRows.map(([, m]) => m.approved + m.quarantine));
   const matBody = matRows.length
-    ? `<div class="panel-body"><ul class="mat-list">${matRows.map(([name, m]) => `<li><div class="mat-head"><strong>${esc(name)}</strong><span>${fmt(m.approved)} <small>available</small>${m.quarantine ? ` · <span class="text-warn">${fmt(m.quarantine)} in QC</span>` : ''}</span></div><span class="stack stack-thin" role="img" aria-label="${esc(name)}: ${fmt(m.approved)} available, ${fmt(m.quarantine)} in quarantine"><span class="stack-seg tone-ok" data-w="${(m.approved / maxMat) * 100}"></span><span class="stack-seg tone-warn" data-w="${(m.quarantine / maxMat) * 100}"></span></span></li>`).join('')}</ul><div class="legend legend-inline"><span><span class="legend-swatch tone-ok"></span>Approved stock</span><span><span class="legend-swatch tone-warn"></span>Quarantine</span></div></div>`
-    : empty('No material lots', 'Receive lots on the Materials page.', '', 'lots');
+    ? `<div class="panel-body"><ul class="mat-list">${matRows.map(([name, m]) => `<li><div class="mat-head"><strong>${esc(name)}</strong><span>${t('mat.available', {n: fmt(m.approved)})}${m.quarantine ? ` · <span class="text-warn">${t('mat.inQc', {n: fmt(m.quarantine)})}</span>` : ''}</span></div><span class="stack stack-thin" role="img" aria-label="${t('mat.aria', {name, approved: fmt(m.approved), quarantine: fmt(m.quarantine)})}"><span class="stack-seg tone-ok" data-w="${(m.approved / maxMat) * 100}"></span><span class="stack-seg tone-warn" data-w="${(m.quarantine / maxMat) * 100}"></span></span></li>`).join('')}</ul><div class="legend legend-inline"><span><span class="legend-swatch tone-ok"></span>${t('mat.legend.approved')}</span><span><span class="legend-swatch tone-warn"></span>${t('mat.legend.quarantine')}</span></div></div>`
+    : empty(t('mat.empty.title'), t('mat.empty.text'), '', 'lots');
 
-  // activity
-  const actBody = state.audit.length ? timeline(state.audit.slice(0, 6), {compact: true}) : empty('No activity yet', '', '', 'audit');
+  const actBody = state.audit.length ? timeline(state.audit.slice(0, 6), {compact: true}) : empty(t('audit.empty'), '', '', 'audit');
 
   $('#content').innerHTML =
-    pageHead('Production overview', `Live data for this plant · up to 500 most recent orders · times in ${esc(tz())}`,
-      btn('Refresh', 'data-cmd="refresh"', 'btn-secondary', 'refresh') + (can('planner') ? btn('New order', 'data-cmd="new-order"', 'btn-primary', 'plus') : '')) +
+    pageHead(t('overview.title'), t('overview.subtitle', {tz: tz()}), btn(t('common.refresh'), 'data-cmd="refresh"', 'btn-secondary', 'refresh') + newOrderBtn()) +
     kpis +
-    `<div class="grid grid-2">${panel('Orders by status', statusBody, `<button type="button" class="link-btn" data-cmd="go" data-page="orders">View all ${icon('chevR')}</button>`)}${panel('Needs attention', attnBody, attn.length ? `<span class="count-pill">${attn.length}</span>` : '')}</div>` +
-    `<div class="grid grid-wide">${panel('Work in progress', wipBody, `<span class="panel-meta">${fmt(active.length)} active</span>`)}${panel('Material availability', matBody, `<button type="button" class="link-btn" data-cmd="go" data-page="lots">Materials ${icon('chevR')}</button>`)}</div>` +
-    panel('Recent activity', actBody, `<button type="button" class="link-btn" data-cmd="go" data-page="audit">Full log ${icon('chevR')}</button>`);
+    `<div class="grid grid-2">${panel(t('overview.byStatus'), statusBody, `<button type="button" class="link-btn" data-cmd="go" data-page="orders">${t('common.viewAll')} ${icon('chevR')}</button>`)}${panel(t('overview.attention'), attnBody, attn.length ? `<span class="count-pill">${attn.length}</span>` : '')}</div>` +
+    `<div class="grid grid-wide">${panel(t('overview.wip'), wipBody, `<span class="panel-meta">${t('overview.activeCount', {n: fmt(active.length)})}</span>`)}${panel(t('overview.materials'), matBody, `<button type="button" class="link-btn" data-cmd="go" data-page="lots">${t('nav.lots')} ${icon('chevR')}</button>`)}</div>` +
+    panel(t('overview.activity'), actBody, `<button type="button" class="link-btn" data-cmd="go" data-page="audit">${t('overview.fullLog')} ${icon('chevR')}</button>`);
 }
 
 // ----- orders -----
 function renderOrders() {
   $('#content').innerHTML =
-    pageHead('Work orders', 'Release, run, inspect and close production orders.', can('planner') ? btn('New order', 'data-cmd="new-order"', 'btn-primary', 'plus') : '') +
-    `<section class="panel"><div class="panel-toolbar"><div class="chips" id="order-chips" role="group" aria-label="Filter by status"></div><label class="search">${icon('search')}<span class="sr-only">Search orders</span><input id="order-search" type="search" placeholder="Search order or product" value="${esc(state.filters.orderQ)}"></label></div><div id="order-list"></div></section>`;
+    pageHead(t('nav.orders'), t('orders.subtitle'), newOrderBtn()) +
+    `<section class="panel"><div class="panel-toolbar"><div class="chips" id="order-chips" role="group" aria-label="${t('orders.filterAria')}"></div><label class="search">${icon('search')}<span class="sr-only">${t('orders.search')}</span><input id="order-search" type="search" placeholder="${t('orders.search')}" value="${esc(state.filters.orderQ)}"></label></div><div id="order-list"></div></section>`;
   renderOrderRows();
 }
 function renderOrderRows() {
   const states = ['', 'draft', 'released', 'in_progress', 'on_hold', 'completed'];
   const count = s => (s ? state.orders.filter(o => o.state === s).length : state.orders.length);
-  $('#order-chips').innerHTML = states.map(s => `<button type="button" class="chip ${state.filters.orderState === s ? 'active' : ''}" aria-pressed="${state.filters.orderState === s}" data-cmd="order-filter" data-value="${s}">${s ? ORDER_LABELS[s] : 'All'}<span>${count(s)}</span></button>`).join('');
+  $('#order-chips').innerHTML = states.map(s => `<button type="button" class="chip ${state.filters.orderState === s ? 'active' : ''}" aria-pressed="${state.filters.orderState === s}" data-cmd="order-filter" data-value="${s}">${s ? statusLabel(s) : t('common.all')}<span>${count(s)}</span></button>`).join('');
   const q = state.filters.orderQ.trim().toLowerCase();
   const rows = state.orders.filter(o => (!state.filters.orderState || o.state === state.filters.orderState) && `${o.code} ${o.product}`.toLowerCase().includes(q));
   $('#order-list').innerHTML = rows.length ? orderTable(rows) : (state.orders.length
-    ? empty('No matching orders', 'Try another status or search term.', '', 'search')
-    : empty('No work orders yet', 'Create an order from a configured route to start production.', can('planner') ? btn('New order', 'data-cmd="new-order"', 'btn-primary', 'plus') : ''));
+    ? empty(t('orders.noMatch.title'), t('orders.noMatch.text'), '', 'search')
+    : empty(t('orders.empty.title'), t('orders.empty.text'), newOrderBtn()));
   applyWidths($('#order-list'));
 }
 function orderTable(rows) {
-  return `<div class="table-wrap"><table class="table table-cards"><thead><tr><th>Order</th><th>Product</th><th class="num">Planned</th><th>Progress</th><th>Status</th><th>Quality</th><th><span class="sr-only">Open</span></th></tr></thead><tbody>${rows.map(o => {
+  const col = k => t(`orders.col.${k}`);
+  return `<div class="table-wrap"><table class="table table-cards"><thead><tr><th>${col('order')}</th><th>${col('product')}</th><th class="num">${col('planned')}</th><th>${col('progress')}</th><th>${col('status')}</th><th>${col('quality')}</th><th><span class="sr-only">${t('common.open')}</span></th></tr></thead><tbody>${rows.map(o => {
     const done = o.operations.filter(x => x.done).length, p = orderProgress(o);
-    return `<tr class="row-link" data-cmd="open-order" data-id="${o.id}" tabindex="0" aria-label="Open order ${esc(o.code)}">
-      <td data-label="Order"><span class="cell-main mono">${esc(o.code)}</span><span class="cell-sub">${time(o.created_at)}</span></td>
-      <td data-label="Product"><span class="cell-main">${esc(o.product)}</span><span class="cell-sub">Revision ${o.revision}</span></td>
-      <td data-label="Planned" class="num"><span class="cell-main">${fmt(o.planned_qty)}</span><span class="cell-sub">pcs</span></td>
-      <td data-label="Progress"><div class="progress-cell">${bar(p, o.state === 'on_hold' ? 'warn' : o.state === 'completed' ? 'ok' : 'violet')}<span class="cell-sub">${done}/${o.operations.length} operations</span></div></td>
-      <td data-label="Status">${badge(o.state)}</td>
-      <td data-label="Quality">${qualityBadge(o)}</td>
+    return `<tr class="row-link" data-cmd="open-order" data-id="${o.id}" tabindex="0" aria-label="${t('orders.openAria', {code: o.code})}">
+      <td data-label="${col('order')}" data-col="order"><span class="cell-main mono">${esc(o.code)}</span><span class="cell-sub">${time(o.created_at)}</span></td>
+      <td data-label="${col('product')}"><span class="cell-main">${esc(o.product)}</span><span class="cell-sub">${t('common.revision', {rev: o.revision})}</span></td>
+      <td data-label="${col('planned')}" class="num"><span class="cell-main">${fmt(o.planned_qty)}</span><span class="cell-sub">${t('common.pcs')}</span></td>
+      <td data-label="${col('progress')}"><div class="progress-cell">${bar(p, o.state === 'on_hold' ? 'warn' : o.state === 'completed' ? 'ok' : 'violet')}<span class="cell-sub">${t('orders.opsDone', {done, total: o.operations.length})}</span></div></td>
+      <td data-label="${col('status')}">${badge(o.state)}</td>
+      <td data-label="${col('quality')}">${qualityBadge(o)}</td>
       <td class="cell-chev">${icon('chevR')}</td></tr>`;
   }).join('')}</tbody></table></div>`;
 }
@@ -479,75 +518,81 @@ function renderDetail() {
   const canHold = ['released', 'in_progress'].includes(o.state) && can('planner', 'operator', 'quality');
 
   // lifecycle stepper
-  const steps = ['Draft', 'Released', 'Production', 'Final QC', 'Closed'];
+  const steps = ['draft', 'released', 'production', 'qc', 'closed'];
   const anyRecorded = o.operations.some(op => op.good + op.scrap > 0);
   const allDone = o.operations.every(op => op.done);
   const idx = {draft: 0, released: 1, production: 2, qc: 3, close: 4, closed: 5, hold: allDone ? 3 : anyRecorded ? 2 : 1}[phase];
-  const stepper = `<ol class="stepper" aria-label="Order lifecycle">${steps.map((s, i) => {
+  const stepper = `<ol class="stepper" aria-label="${t('detail.lifecycle')}">${steps.map((s, i) => {
     const st = i < idx ? 'done' : i === idx ? (phase === 'hold' ? 'hold' : 'current') : 'todo';
-    return `<li class="step-${st}" ${st === 'current' || st === 'hold' ? 'aria-current="step"' : ''}><span class="stepper-dot">${st === 'done' ? icon('check') : st === 'hold' ? icon('pause') : i + 1}</span><span class="stepper-label">${s}</span></li>`;
+    return `<li class="step-${st}" ${st === 'current' || st === 'hold' ? 'aria-current="step"' : ''}><span class="stepper-dot">${st === 'done' ? icon('check') : st === 'hold' ? icon('pause') : i + 1}</span><span class="stepper-label">${t(`step.${s}`)}</span></li>`;
   }).join('')}</ol>`;
 
   // next step callout
   const cur = currentOpIndex(o), curOp = o.operations[cur];
   let next;
-  if (phase === 'draft') next = {tone: 'info', ic: 'play', title: 'Release this order', text: 'Allocate QC-approved material lots that match the BOM, then release to the shop floor.', action: can('planner') ? btn('Allocate & release', 'data-cmd="order-action" data-action="release"', 'btn-primary', 'play') : '', wait: 'Waiting for a planner to release.'};
+  if (phase === 'draft') next = {tone: 'info', ic: 'play', title: t('next.release.title'), text: t('next.release.text'), action: can('planner') ? btn(t('next.release.action'), 'data-cmd="order-action" data-action="release"', 'btn-primary', 'play') : '', wait: t('next.release.wait')};
   else if (phase === 'released' || phase === 'production') {
     const capCur = capacityOf(o, cur), rem = capCur - curOp.good - curOp.scrap;
-    next = {tone: 'violet', ic: 'tool', title: `Record output at ${esc(curOp.name)}`, text: `Work center ${esc(curOp.work_center)} · ${fmt(rem)} of ${fmt(capCur)} pcs still to record.`, action: can('operator') ? btn('Record output', `data-cmd="order-action" data-action="record" data-id="${curOp.id}"`, 'btn-primary', 'tool') : '', wait: 'Waiting for an operator to record output.'};
-  } else if (phase === 'qc') next = {tone: 'info', ic: 'shield', title: 'Run the final inspection', text: 'All operations are finished. Record the final quality decision.', action: can('quality') ? btn('Record inspection', 'data-cmd="order-action" data-action="quality"', 'btn-primary', 'shield') : '', wait: 'Waiting for a quality inspector.'};
-  else if (phase === 'close') next = {tone: 'ok', ic: 'flag', title: 'Close the order', text: `Final inspection passed with ${fmt(good)} good pcs. Closing locks the order and creates output lot ${esc(o.code)}.`, action: can('planner') ? btn('Close order', 'data-cmd="order-action" data-action="complete"', 'btn-primary', 'flag') : '', wait: 'Waiting for a planner to close the order.'};
-  else if (phase === 'hold') next = {tone: 'warn', ic: 'pause', title: 'Order on hold', text: `Reason: ${esc(o.hold_reason || '—')}`, action: can('quality') ? btn('Resume order', 'data-cmd="order-action" data-action="resume"', 'btn-primary', 'play') : '', wait: 'A quality user must record the corrective action and resume.'};
-  else next = {tone: 'ok', ic: 'check', title: 'Order closed', text: `Output lot ${esc(o.code)} · ${fmt(good)} good pcs of ${fmt(o.planned_qty)} planned.`, action: btn('View traceability', 'data-cmd="trace"', 'btn-secondary', 'link'), wait: ''};
+    next = {tone: 'violet', ic: 'tool', title: t('next.record.title', {name: curOp.name}), text: t('next.record.text', {wc: curOp.work_center, rem: fmt(rem), cap: fmt(capCur)}), action: can('operator') ? btn(t('next.record.action'), `data-cmd="order-action" data-action="record" data-id="${curOp.id}"`, 'btn-primary', 'tool') : '', wait: t('next.record.wait')};
+  } else if (phase === 'qc') next = {tone: 'info', ic: 'shield', title: t('next.qc.title'), text: t('next.qc.text'), action: can('quality') ? btn(t('next.qc.action'), 'data-cmd="order-action" data-action="quality"', 'btn-primary', 'shield') : '', wait: t('next.qc.wait')};
+  else if (phase === 'close') next = {tone: 'ok', ic: 'flag', title: t('next.close.title'), text: t('next.close.text', {good: fmt(good), code: o.code}), action: can('planner') ? btn(t('next.close.action'), 'data-cmd="order-action" data-action="complete"', 'btn-primary', 'flag') : '', wait: t('next.close.wait')};
+  else if (phase === 'hold') next = {tone: 'warn', ic: 'pause', title: t('next.hold.title'), text: t('next.hold.text', {reason: o.hold_reason || '—'}), action: can('quality') ? btn(t('next.hold.action'), 'data-cmd="order-action" data-action="resume"', 'btn-primary', 'play') : '', wait: t('next.hold.wait')};
+  else next = {tone: 'ok', ic: 'check', title: t('next.closed.title'), text: t('next.closed.text', {code: o.code, good: fmt(good), planned: fmt(o.planned_qty)}), action: btn(t('next.closed.action'), 'data-cmd="trace"', 'btn-secondary', 'link'), wait: ''};
   const callout = `<div class="callout tone-${next.tone}">${icon(next.ic)}<div><strong>${next.title}</strong><p>${next.text}${!next.action && next.wait ? ` <em>${next.wait}</em>` : ''}</p></div>${next.action}</div>`;
 
+  const pcs = `<small>${t('common.pcs')}</small>`;
   const stat = (label, value, sub = '') => `<div class="stat"><span class="stat-label">${label}</span><span class="stat-value">${value}</span>${sub ? `<span class="stat-sub">${sub}</span>` : ''}</div>`;
-  const stats = `<div class="stats">${stat('Planned', `${fmt(o.planned_qty)} <small>pcs</small>`)}${stat('Good output', `${fmt(good)} <small>pcs</small>`, `${ratio(good, o.planned_qty).toFixed(0)}% of plan`)}${stat('Scrap', `${fmt(scrap)} <small>pcs</small>`, scrap ? 'across all operations' : '')}${stat('Created', `<span class="stat-date">${time(o.created_at)}</span>`)}</div>`;
+  const stats = `<div class="stats">${stat(t('detail.planned'), `${fmt(o.planned_qty)} ${pcs}`)}${stat(t('detail.good'), `${fmt(good)} ${pcs}`, t('detail.ofPlan', {pct: ratio(good, o.planned_qty).toFixed(0)}))}${stat(t('detail.scrap'), `${fmt(scrap)} ${pcs}`, scrap ? t('detail.scrapAll') : '')}${stat(t('detail.created'), `<span class="stat-date">${time(o.created_at)}</span>`)}</div>`;
 
   const ops = o.operations.map((op, i) => {
     const cap = capacityOf(o, i), used = op.good + op.scrap, prevDone = i === 0 || o.operations[i - 1].done;
     const enabled = ['released', 'in_progress'].includes(o.state) && !op.done && prevDone && can('operator');
     const st = op.done ? 'completed' : used > 0 ? 'in_progress' : 'queued';
     const projected = i > 0 && !o.operations[i - 1].done;
+    const figures = projected && used === 0
+      ? `<div class="op-figures"><span>${t('op.waits', {name: o.operations[i - 1].name})}</span></div>`
+      : `<div class="op-figures"><span><i class="legend-swatch tone-ok"></i>${t('op.good')} <strong>${fmt(op.good)}</strong></span><span><i class="legend-swatch tone-bad"></i>${t('op.scrap')} <strong>${fmt(op.scrap)}</strong></span><span>${t('op.input')} <strong>${fmt(cap)}</strong></span><span>${t('op.remaining')} <strong>${fmt(Math.max(cap - used, 0))}</strong></span></div>`;
     return `<li class="op op-${st}"><span class="op-num" aria-hidden="true">${op.done ? icon('check') : op.sequence}</span>
-      <div class="op-body"><div class="op-head"><div><strong>${esc(op.name)}</strong><small>${esc(op.work_center)}</small></div>${badge(st)}</div>
-      <span class="stack" role="img" aria-label="${fmt(op.good)} good, ${fmt(op.scrap)} scrap of ${fmt(cap)} input"><span class="stack-seg tone-ok" data-w="${cap ? (op.good / cap) * 100 : 0}"></span><span class="stack-seg tone-bad" data-w="${cap ? (op.scrap / cap) * 100 : 0}"></span></span>
-      ${projected && used === 0 ? `<div class="op-figures"><span>Starts when <strong>${esc(o.operations[i - 1].name)}</strong> is finished</span></div>` : `<div class="op-figures"><span><i class="legend-swatch tone-ok"></i>Good <strong>${fmt(op.good)}</strong></span><span><i class="legend-swatch tone-bad"></i>Scrap <strong>${fmt(op.scrap)}</strong></span><span>Input <strong>${fmt(cap)}</strong></span><span>Remaining <strong>${fmt(Math.max(cap - used, 0))}</strong></span></div>`}</div>
-      ${enabled ? btn('Record', `data-cmd="order-action" data-action="record" data-id="${op.id}"`, i === cur ? 'btn-primary btn-sm' : 'btn-secondary btn-sm', 'tool') : ''}</li>`;
+      <div class="op-body"><div class="op-head"><div><strong>${esc(op.name)}</strong><small>${esc(op.work_center)}</small></div>${opBadge(st)}</div>
+      <span class="stack" role="img" aria-label="${t('op.aria', {good: fmt(op.good), scrap: fmt(op.scrap), input: fmt(cap)})}"><span class="stack-seg tone-ok" data-w="${cap ? (op.good / cap) * 100 : 0}"></span><span class="stack-seg tone-bad" data-w="${cap ? (op.scrap / cap) * 100 : 0}"></span></span>
+      ${figures}</div>
+      ${enabled ? btn(t('op.record'), `data-cmd="order-action" data-action="record" data-id="${op.id}"`, i === cur ? 'btn-primary btn-sm' : 'btn-secondary btn-sm', 'tool') : ''}</li>`;
   }).join('');
 
-  const headActions = (canHold ? btn('Put on hold', 'data-cmd="order-action" data-action="hold"', 'btn-secondary', 'pause') : '') + btn('Traceability', 'data-cmd="trace"', 'btn-secondary', 'link');
+  const headActions = (canHold ? btn(t('detail.hold'), 'data-cmd="order-action" data-action="hold"', 'btn-secondary', 'pause') : '') + btn(t('detail.trace'), 'data-cmd="trace"', 'btn-secondary', 'link');
+  const subtitle = `${esc(o.product)} · ${t('common.revision', {rev: o.revision})}${route ? ` · ${esc(route.name)}` : ''}`;
   $('#content').innerHTML =
-    `<button type="button" class="back-link" data-cmd="back">${icon('chevL')}Work orders</button>` +
-    pageHead(`<span class="mono">${esc(o.code)}</span> ${badge(o.state)} ${o.quality !== 'pending' || phase === 'qc' ? badge(o.quality) : ''}`, `${esc(o.product)} · Revision ${o.revision}${route ? ` · ${esc(route.name)}` : ''}`, headActions) +
+    `<button type="button" class="back-link" data-cmd="back">${icon('chevL')}${t('nav.orders')}</button>` +
+    pageHead(`<span class="mono">${esc(o.code)}</span> ${badge(o.state)} ${o.quality !== 'pending' || phase === 'qc' ? badge(o.quality) : ''}`, subtitle, headActions) +
     stepper + callout + stats +
-    panel('Operations', `<ol class="op-list">${ops}</ol><p class="panel-note">Only good units from the previous operation move forward. An operation can be finished once its full input is recorded.</p>`, `<span class="panel-meta">${o.operations.filter(x => x.done).length} of ${o.operations.length} finished</span>`);
+    panel(t('detail.operations'), `<ol class="op-list">${ops}</ol><p class="panel-note">${t('detail.opsNote')}</p>`, `<span class="panel-meta">${t('detail.opsFinished', {done: o.operations.filter(x => x.done).length, total: o.operations.length})}</span>`);
   applyWidths($('#content'));
 }
 
 // ----- materials -----
 function renderLots() {
   $('#content').innerHTML =
-    pageHead('Materials', 'Received lots, quality decisions and stock available to issue.', can('planner') ? btn('Receive lot', 'data-cmd="new-lot"', 'btn-primary', 'plus') : '') +
-    `<section class="panel"><div class="panel-toolbar"><div class="chips" id="lot-chips" role="group" aria-label="Filter by quality"></div><label class="search">${icon('search')}<span class="sr-only">Search lots</span><input id="lot-search" type="search" placeholder="Search lot or material" value="${esc(state.filters.lotQ)}"></label></div><div id="lot-list"></div></section>`;
+    pageHead(t('nav.lots'), t('lots.subtitle'), can('planner') ? btn(t('lots.receive'), 'data-cmd="new-lot"', 'btn-primary', 'plus') : '') +
+    `<section class="panel"><div class="panel-toolbar"><div class="chips" id="lot-chips" role="group" aria-label="${t('lots.filterAria')}"></div><label class="search">${icon('search')}<span class="sr-only">${t('lots.search')}</span><input id="lot-search" type="search" placeholder="${t('lots.search')}" value="${esc(state.filters.lotQ)}"></label></div><div id="lot-list"></div></section>`;
   renderLotRows();
 }
 function renderLotRows() {
   const opts = ['', 'quarantine', 'released', 'rejected'];
   const count = s => (s ? state.lots.filter(l => l.quality === s).length : state.lots.length);
-  $('#lot-chips').innerHTML = opts.map(s => `<button type="button" class="chip ${state.filters.lotQuality === s ? 'active' : ''}" aria-pressed="${state.filters.lotQuality === s}" data-cmd="lot-filter" data-value="${s}">${s ? LOT_LABELS[s] : 'All'}<span>${count(s)}</span></button>`).join('');
+  $('#lot-chips').innerHTML = opts.map(s => `<button type="button" class="chip ${state.filters.lotQuality === s ? 'active' : ''}" aria-pressed="${state.filters.lotQuality === s}" data-cmd="lot-filter" data-value="${s}">${s ? lotLabel(s) : t('common.all')}<span>${count(s)}</span></button>`).join('');
   const q = state.filters.lotQ.trim().toLowerCase();
   const rows = state.lots.filter(l => (!state.filters.lotQuality || l.quality === state.filters.lotQuality) && `${l.code} ${l.material}`.toLowerCase().includes(q));
+  const col = k => t(`lots.col.${k}`);
   $('#lot-list').innerHTML = rows.length
-    ? `<div class="table-wrap"><table class="table table-cards"><thead><tr><th>Lot</th><th>Material</th><th class="num">Received</th><th>Available</th><th>Quality</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>${rows.map(l => `<tr>
-        <td data-label="Lot"><span class="cell-main mono">${esc(l.code)}</span></td>
-        <td data-label="Material"><span class="cell-main">${esc(l.material)}</span></td>
-        <td data-label="Received" class="num">${fmt(l.received)} <span class="cell-sub-inline">${esc(l.unit)}</span></td>
-        <td data-label="Available"><div class="progress-cell">${bar(ratio(l.available, l.received), l.quality === 'released' ? 'ok' : l.quality === 'rejected' ? 'bad' : 'warn', `${fmt(l.available)} of ${fmt(l.received)} available`)}<span class="cell-sub">${fmt(l.available)} ${esc(l.unit)} left</span></div></td>
-        <td data-label="Quality">${badge(l.quality, 'lot')}</td>
-        <td class="cell-actions">${l.quality === 'quarantine' && can('quality') ? btn('Inspect', `data-cmd="lot-qc" data-id="${l.id}"`, 'btn-primary btn-sm', 'shield') : ''}${btn('Where used', `data-cmd="where-used" data-id="${l.id}"`, 'btn-ghost btn-sm', 'link')}</td></tr>`).join('')}</tbody></table></div>`
-    : (state.lots.length ? empty('No matching lots', 'Try another filter or search term.', '', 'search')
-      : empty('No material lots yet', 'Received lots start in quarantine until quality approves them.', can('planner') ? btn('Receive lot', 'data-cmd="new-lot"', 'btn-primary', 'plus') : '', 'lots'));
+    ? `<div class="table-wrap"><table class="table table-cards"><thead><tr><th>${col('lot')}</th><th>${col('material')}</th><th class="num">${col('received')}</th><th>${col('available')}</th><th>${col('quality')}</th><th><span class="sr-only">${t('common.actions')}</span></th></tr></thead><tbody>${rows.map(l => `<tr>
+        <td data-label="${col('lot')}"><span class="cell-main mono">${esc(l.code)}</span></td>
+        <td data-label="${col('material')}"><span class="cell-main">${esc(l.material)}</span></td>
+        <td data-label="${col('received')}" class="num">${fmt(l.received)} <span class="cell-sub-inline">${esc(l.unit)}</span></td>
+        <td data-label="${col('available')}"><div class="progress-cell">${bar(ratio(l.available, l.received), l.quality === 'released' ? 'ok' : l.quality === 'rejected' ? 'bad' : 'warn', t('lots.availAria', {available: fmt(l.available), received: fmt(l.received)}))}<span class="cell-sub">${t('lots.left', {n: fmt(l.available), unit: l.unit})}</span></div></td>
+        <td data-label="${col('quality')}">${badge(l.quality, 'lot')}</td>
+        <td class="cell-actions">${l.quality === 'quarantine' && can('quality') ? btn(t('lots.inspect'), `data-cmd="lot-qc" data-id="${l.id}"`, 'btn-primary btn-sm', 'shield') : ''}${btn(t('lots.whereUsed'), `data-cmd="where-used" data-id="${l.id}"`, 'btn-ghost btn-sm', 'link')}</td></tr>`).join('')}</tbody></table></div>`
+    : (state.lots.length ? empty(t('lots.noMatch.title'), t('lots.noMatch.text'), '', 'search')
+      : empty(t('lots.empty.title'), t('lots.empty.text'), can('planner') ? btn(t('lots.receive'), 'data-cmd="new-lot"', 'btn-primary', 'plus') : '', 'lots'));
   applyWidths($('#lot-list'));
 }
 
@@ -555,17 +600,16 @@ function renderLotRows() {
 function renderRoutes() {
   const groups = {};
   state.routes.forEach(r => (groups[r.product] ||= []).push(r));
+  const newRev = can('planner') ? btn(t('routes.new'), 'data-cmd="new-route"', 'btn-primary', 'plus') : '';
   const cards = Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0])).map(([product, revs]) => revs.sort((a, b) => b.revision - a.revision).map((r, k) => `
     <section class="panel route">
-      <div class="panel-head"><div><h2>${esc(product)} <span class="rev">Rev ${r.revision}</span>${k === 0 && revs.length > 1 ? '<span class="badge tone-info"><span class="badge-dot"></span>Latest</span>' : ''}</h2><p class="panel-sub">${esc(r.name)} · ${r.steps.length} operation${r.steps.length > 1 ? 's' : ''} · ${r.bom.length} material${r.bom.length > 1 ? 's' : ''}</p></div><span class="badge tone-neutral"><span class="badge-dot"></span>Locked revision</span></div>
+      <div class="panel-head"><div><h2>${esc(product)} <span class="rev">${t('routes.rev', {rev: r.revision})}</span>${k === 0 && revs.length > 1 ? `<span class="badge tone-info"><span class="badge-dot"></span>${t('routes.latest')}</span>` : ''}</h2><p class="panel-sub">${esc(r.name)} · ${t('routes.counts', {ops: r.steps.length, mats: r.bom.length})}</p></div><span class="badge tone-neutral"><span class="badge-dot"></span>${t('routes.locked')}</span></div>
       <div class="panel-body route-body">
-        <div><h3 class="section-label">Operation sequence</h3><ol class="flow">${r.steps.map((s, i) => `<li><span class="flow-num">${i + 1}</span><span><strong>${esc(s.name)}</strong><small>${esc(s.work_center)}</small></span></li>`).join('')}</ol></div>
-        <div><h3 class="section-label">Bill of materials · per finished unit</h3><table class="table table-compact"><tbody>${r.bom.map(b => `<tr><td class="mono">${esc(b.material)}</td><td class="num"><strong>${fmt(b.per_unit)}</strong> ${esc(b.unit)}</td></tr>`).join('')}</tbody></table></div>
+        <div><h3 class="section-label">${t('routes.sequence')}</h3><ol class="flow">${r.steps.map((s, i) => `<li><span class="flow-num">${i + 1}</span><span><strong>${esc(s.name)}</strong><small>${esc(s.work_center)}</small></span></li>`).join('')}</ol></div>
+        <div><h3 class="section-label">${t('routes.bom')}</h3><table class="table table-compact"><tbody>${r.bom.map(b => `<tr><td class="mono">${esc(b.material)}</td><td class="num"><strong>${fmt(b.per_unit)}</strong> ${esc(b.unit)}</td></tr>`).join('')}</tbody></table></div>
       </div>
     </section>`).join('')).join('');
-  $('#content').innerHTML =
-    pageHead('Routes & BOM', 'Each revision is immutable. To change a route, create a new revision.', can('planner') ? btn('New revision', 'data-cmd="new-route"', 'btn-primary', 'plus') : '') +
-    (cards || empty('No routes yet', 'Define operations and a bill of materials before creating orders.', can('planner') ? btn('New revision', 'data-cmd="new-route"', 'btn-primary', 'plus') : '', 'routes'));
+  $('#content').innerHTML = pageHead(t('nav.routes'), t('routes.subtitle'), newRev) + (cards || empty(t('routes.empty.title'), t('routes.empty.text'), newRev, 'routes'));
 }
 
 // ----- audit -----
@@ -575,22 +619,22 @@ function timeline(items, {compact = false, details = true} = {}) {
     const [label, ic, tone] = eventInfo(a.action), day = dayLabel(a.at);
     const header = !compact && day !== lastDay ? `<li class="timeline-day">${esc(day)}</li>` : '';
     lastDay = day;
-    return `${header}<li class="timeline-item"><span class="timeline-icon tone-${tone}">${icon(ic)}</span><div class="timeline-body"><div><strong>${esc(label)}</strong><small>${esc(a.actor)} · ${esc(ENTITY_LABELS[a.entity] || a.entity)} #${a.entity_id}</small></div><div class="timeline-meta"><time title="${time(a.at)}">${compact ? relative(a.at) : clock(a.at)}</time>${!compact && details ? `<button type="button" class="btn btn-ghost btn-sm" data-cmd="audit-view" data-id="${a.id}">${icon('eye')}<span>Details</span></button>` : ''}</div></div></li>`;
+    return `${header}<li class="timeline-item"><span class="timeline-icon tone-${tone}">${icon(ic)}</span><div class="timeline-body"><div><strong>${esc(label)}</strong><small>${esc(a.actor)} · ${esc(entityLabel(a.entity))} #${a.entity_id}</small></div><div class="timeline-meta"><time title="${time(a.at)}">${compact ? relative(a.at) : clock(a.at)}</time>${!compact && details ? `<button type="button" class="btn btn-ghost btn-sm" data-cmd="audit-view" data-id="${a.id}">${icon('eye')}<span>${t('common.details')}</span></button>` : ''}</div></div></li>`;
   }).join('')}</ol>`;
 }
 function renderAudit() {
   $('#content').innerHTML =
-    pageHead('Activity log', `Read-only, append-only record of every change · times in ${esc(tz())}`) +
-    `<section class="panel"><div class="panel-toolbar"><div class="chips" id="audit-chips" role="group" aria-label="Filter by type"></div><label class="search">${icon('search')}<span class="sr-only">Search activity</span><input id="audit-search" type="search" placeholder="Search user or record" value="${esc(state.filters.auditQ)}"></label></div><div id="audit-list" class="panel-body"></div></section>`;
+    pageHead(t('nav.audit'), t('audit.subtitle', {tz: tz()})) +
+    `<section class="panel"><div class="panel-toolbar"><div class="chips" id="audit-chips" role="group" aria-label="${t('audit.filterAria')}"></div><label class="search">${icon('search')}<span class="sr-only">${t('audit.search')}</span><input id="audit-search" type="search" placeholder="${t('audit.search')}" value="${esc(state.filters.auditQ)}"></label></div><div id="audit-list" class="panel-body"></div></section>`;
   renderAuditList();
 }
 function renderAuditList() {
-  const types = [['', 'All'], ['order', 'Orders'], ['lot', 'Materials'], ['route', 'Routes']];
+  const types = [['', t('common.all')], ['order', t('audit.type.order')], ['lot', t('audit.type.lot')], ['route', t('audit.type.route')]];
   $('#audit-chips').innerHTML = types.map(([v, l]) => `<button type="button" class="chip ${state.filters.auditType === v ? 'active' : ''}" aria-pressed="${state.filters.auditType === v}" data-cmd="audit-filter" data-value="${v}">${l}</button>`).join('');
   const q = state.filters.auditQ.trim().toLowerCase();
-  const items = state.audit.filter(a => (!state.filters.auditType || a.entity === state.filters.auditType) && `${a.actor} ${a.entity} ${a.entity_id} ${eventInfo(a.action)[0]}`.toLowerCase().includes(q));
-  $('#audit-list').innerHTML = (items.length ? timeline(items) : empty(state.audit.length ? 'No matching events' : 'No activity yet', '', '', 'audit')) +
-    (!state.auditDone ? `<div class="load-more">${btn('Load older events', 'data-cmd="audit-more"', 'btn-secondary')}</div>` : '');
+  const items = state.audit.filter(a => (!state.filters.auditType || a.entity === state.filters.auditType) && `${a.actor} ${a.entity} ${entityLabel(a.entity)} ${a.entity_id} ${eventInfo(a.action)[0]}`.toLowerCase().includes(q));
+  $('#audit-list').innerHTML = (items.length ? timeline(items) : empty(state.audit.length ? t('audit.noMatch') : t('audit.empty'), '', '', 'audit')) +
+    (!state.auditDone ? `<div class="load-more">${btn(t('audit.loadMore'), 'data-cmd="audit-more"', 'btn-secondary')}</div>` : '');
 }
 async function loadMoreAudit() {
   const last = state.audit.at(-1); if (!last) return;
@@ -605,7 +649,7 @@ async function loadMoreAudit() {
 function auditView(id) {
   const a = state.audit.find(x => x.id === id); if (!a) return;
   const [label, ic, tone] = eventInfo(a.action);
-  showDialog(label, `<div class="dialog-summary"><span class="timeline-icon tone-${tone}">${icon(ic)}</span><div><strong>${esc(a.actor)}</strong><small>${time(a.at)} · ${esc(ENTITY_LABELS[a.entity] || a.entity)} #${a.entity_id}</small></div></div><h3 class="section-label">Recorded payload</h3><pre class="code-block">${esc(JSON.stringify(a.payload, null, 2))}</pre>`);
+  showDialog(label, `<div class="dialog-summary"><span class="timeline-icon tone-${tone}">${icon(ic)}</span><div><strong>${esc(a.actor)}</strong><small>${time(a.at)} · ${esc(entityLabel(a.entity))} #${a.entity_id}</small></div></div><h3 class="section-label">${t('audit.payload')}</h3><pre class="code-block">${esc(JSON.stringify(a.payload, null, 2))}</pre>`);
 }
 
 // ---------- dialogs ----------
@@ -617,12 +661,11 @@ function showDialog(title, body, size = '') {
   if (!$('#dialog').open) $('#dialog').showModal();
 }
 function formDialog(title, fields, submitLabel, onSubmit, {onMount, size = '', note = ''} = {}) {
-  showDialog(title, `<form id="modal-form" novalidate>${fields}${note ? `<p class="form-note">${note}</p>` : ''}<p class="form-error" role="alert"></p><div class="form-actions"><button type="button" class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" type="submit">${submitLabel}</button></div></form>`, size);
+  showDialog(title, `<form id="modal-form" novalidate>${fields}${note ? `<p class="form-note">${note}</p>` : ''}<p class="form-error" role="alert"></p><div class="form-actions"><button type="button" class="btn btn-ghost" data-close>${t('common.cancel')}</button><button class="btn btn-primary" type="submit">${submitLabel}</button></div></form>`, size);
   const form = $('#modal-form'), key = crypto.randomUUID();
   $('[data-close]', form).onclick = () => $('#dialog').close();
   onMount?.(form);
-  const first = form.querySelector('input:not([type=hidden]):not([readonly]),select,textarea');
-  first?.focus();
+  form.querySelector('input:not([type=hidden]):not([readonly]),select,textarea')?.focus();
   form.onsubmit = async event => {
     event.preventDefault();
     const button = $('button[type=submit]', form), error = $('.form-error', form);
@@ -631,64 +674,64 @@ function formDialog(title, fields, submitLabel, onSubmit, {onMount, size = '', n
     button.disabled = true; button.classList.add('is-busy');
     try {
       await onSubmit(new FormData(form), key, form);
-      $('#dialog').close(); toast('Changes saved'); await load();
+      $('#dialog').close(); toast(t('common.saved')); await load();
     } catch (e) { error.textContent = e.message; }
     finally { button.disabled = false; button.classList.remove('is-busy'); }
   };
 }
 const field = (label, input, hint = '') => `<label class="field"><span>${label}</span>${input}${hint ? `<small class="hint">${hint}</small>` : ''}</label>`;
-const CODE_PATTERN = 'pattern="[A-Za-z0-9_.\\-]+" title="Letters, numbers, dot, dash and underscore only"';
+const codePattern = () => `pattern="[A-Za-z0-9_.\\-]+" title="${t('form.codeHint')}"`;
 const materialsDatalist = () => {
   const set = new Set([...state.lots.map(l => l.material), ...state.routes.flatMap(r => r.bom.map(b => b.material))]);
   return `<datalist id="material-options">${[...set].sort().map(m => `<option value="${esc(m)}"></option>`).join('')}</datalist>`;
 };
 
 function newOrder() {
-  if (!state.routes.length) { toast('Create a route and BOM first.', 'bad'); return; }
+  if (!state.routes.length) { toast(t('toast.needRoute'), 'bad'); return; }
   const path = base(), now = new Date();
   const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
   const codes = new Set(state.orders.map(o => o.code));
   let n = 1; while (codes.has(`WO-${stamp}-${String(n).padStart(3, '0')}`)) n++;
   const routes = [...state.routes].sort((a, b) => a.product.localeCompare(b.product) || b.revision - a.revision);
-  formDialog('New work order',
-    `<div class="form-grid">${field('Order code', `<input name="code" required ${CODE_PATTERN} maxlength="80" value="WO-${stamp}-${String(n).padStart(3, '0')}" class="mono">`)}${field('Planned quantity (pcs)', '<input name="planned_qty" type="number" min="1" max="100000000" step="1" required inputmode="numeric" placeholder="e.g. 100">')}</div>
-     ${field('Route & revision', `<select name="route_id">${routes.map(r => `<option value="${r.id}">${esc(r.product)} · Rev ${r.revision} · ${esc(r.name)}</option>`).join('')}</select>`)}
+  formDialog(t('newOrder.title'),
+    `<div class="form-grid">${field(t('newOrder.code'), `<input name="code" required ${codePattern()} maxlength="80" value="WO-${stamp}-${String(n).padStart(3, '0')}" class="mono">`)}${field(t('newOrder.qty'), `<input name="planned_qty" type="number" min="1" max="100000000" step="1" required inputmode="numeric" placeholder="${t('newOrder.qtyPlaceholder')}">`)}</div>
+     ${field(t('newOrder.route'), `<select name="route_id">${routes.map(r => `<option value="${r.id}">${esc(r.product)} · ${t('routes.rev', {rev: r.revision})} · ${esc(r.name)}</option>`).join('')}</select>`)}
      <div class="req-box" id="req-box"></div>`,
-    'Create draft order',
+    t('newOrder.submit'),
     (f, key) => post(path + '/orders', {code: f.get('code').trim(), route_id: Number(f.get('route_id')), planned_qty: Number(f.get('planned_qty'))}, key),
     {onMount: form => {
       const update = () => {
         const r = state.routes.find(x => x.id === Number(form.route_id.value)), qty = Number(form.planned_qty.value) || 0;
         if (!r) return;
-        $('#req-box').innerHTML = `<h3 class="section-label">Material requirement${qty ? ` for ${fmt(qty)} pcs` : ''}</h3><ul class="req-list">${r.bom.map(b => {
+        $('#req-box').innerHTML = `<h3 class="section-label">${qty ? t('newOrder.reqFor', {qty: fmt(qty)}) : t('newOrder.req')}</h3><ul class="req-list">${r.bom.map(b => {
           const need = b.per_unit * qty, have = state.lots.filter(l => l.material === b.material && l.quality === 'released').reduce((s, l) => s + l.available, 0);
           const ok = !qty || have >= need;
-          return `<li><span class="mono">${esc(b.material)}</span><span>${qty ? fmt(need) : `${fmt(b.per_unit)} / unit`}</span><span class="${ok ? 'text-ok' : 'text-bad'}">${icon(ok ? 'check' : 'alert')}${fmt(have)} approved in stock</span></li>`;
+          return `<li><span class="mono">${esc(b.material)}</span><span>${qty ? fmt(need) : t('newOrder.perUnit', {n: fmt(b.per_unit)})}</span><span class="${ok ? 'text-ok' : 'text-bad'}">${icon(ok ? 'check' : 'alert')}${t('newOrder.inStock', {n: fmt(have)})}</span></li>`;
         }).join('')}</ul><p class="form-note">${r.steps.map(s => esc(s.name)).join(' → ')}</p>`;
       };
       form.route_id.onchange = update; form.planned_qty.oninput = update; update();
-    }, note: 'The order starts as a draft. Materials are issued when it is released.'});
+    }, note: t('newOrder.note')});
 }
 
 function newLot() {
   const path = base();
-  formDialog('Receive material lot',
-    `<div class="form-grid">${field('Lot code', `<input name="code" required ${CODE_PATTERN} maxlength="80" class="mono" placeholder="e.g. HOUSING-002">`)}${field('Material code', `<input name="material" required ${CODE_PATTERN} maxlength="80" list="material-options" class="mono" placeholder="e.g. HOUSING">`)}</div>${materialsDatalist()}
-     ${field('Quantity received (pcs)', '<input name="quantity" type="number" min="1" step="1" max="100000000" required inputmode="numeric">')}`,
-    'Receive lot',
+  formDialog(t('newLot.title'),
+    `<div class="form-grid">${field(t('newLot.code'), `<input name="code" required ${codePattern()} maxlength="80" class="mono" placeholder="${t('newLot.codePlaceholder')}">`)}${field(t('newLot.material'), `<input name="material" required ${codePattern()} maxlength="80" list="material-options" class="mono" placeholder="${t('newLot.materialPlaceholder')}">`)}</div>${materialsDatalist()}
+     ${field(t('newLot.qty'), '<input name="quantity" type="number" min="1" step="1" max="100000000" required inputmode="numeric">')}`,
+    t('newLot.submit'),
     f => post(path + '/lots', {code: f.get('code').trim(), material: f.get('material').trim(), quantity: Number(f.get('quantity'))}),
-    {note: 'New lots start in quarantine. Quality must approve a lot before it can be issued to production.'});
+    {note: t('newLot.note')});
 }
 
-const decisionPicker = (name, options) => `<fieldset class="choice-group"><legend class="sr-only">Decision</legend>${options.map(([value, title, text, tone], i) => `<label class="choice tone-${tone}"><input type="radio" name="${name}" value="${value}" ${i === 0 ? 'checked' : ''} required><span class="choice-mark">${icon(tone === 'ok' ? 'check' : 'x')}</span><span><strong>${title}</strong><small>${text}</small></span></label>`).join('')}</fieldset>`;
+const decisionPicker = (name, options) => `<fieldset class="choice-group"><legend class="sr-only">${t('form.decision')}</legend>${options.map(([value, title, text, tone], i) => `<label class="choice tone-${tone}"><input type="radio" name="${name}" value="${value}" ${i === 0 ? 'checked' : ''} required><span class="choice-mark">${icon(tone === 'ok' ? 'check' : 'x')}</span><span><strong>${title}</strong><small>${text}</small></span></label>`).join('')}</fieldset>`;
 
 function lotQuality(id) {
   const lot = state.lots.find(l => l.id === id), path = base();
-  formDialog(`Inspect lot ${lot ? lot.code : ''}`,
-    (lot ? `<div class="dialog-summary"><span class="timeline-icon tone-warn">${icon('lots')}</span><div><strong class="mono">${esc(lot.material)}</strong><small>${fmt(lot.received)} ${esc(lot.unit)} received · in quarantine</small></div></div>` : '') +
-    decisionPicker('decision', [['released', 'Approve', 'Lot can be issued to production', 'ok'], ['rejected', 'Reject', 'Lot is blocked from use', 'bad']]) +
-    field('Inspection notes', '<textarea name="reason" required minlength="3" maxlength="500" rows="3" placeholder="Results, sample size, reference…"></textarea>', 'At least 3 characters.'),
-    'Save decision',
+  formDialog(t('lotQc.title', {code: lot ? lot.code : ''}),
+    (lot ? `<div class="dialog-summary"><span class="timeline-icon tone-warn">${icon('lots')}</span><div><strong class="mono">${esc(lot.material)}</strong><small>${t('lotQc.summary', {n: fmt(lot.received), unit: lot.unit})}</small></div></div>` : '') +
+    decisionPicker('decision', [['released', t('lotQc.approve'), t('lotQc.approve.text'), 'ok'], ['rejected', t('lotQc.reject'), t('lotQc.reject.text'), 'bad']]) +
+    field(t('form.inspectionNotes'), `<textarea name="reason" required minlength="3" maxlength="500" rows="3" placeholder="${t('lotQc.placeholder')}"></textarea>`, t('form.min3')),
+    t('lotQc.submit'),
     f => post(`${path}/lots/${id}/quality`, {decision: f.get('decision'), reason: f.get('reason')}));
 }
 
@@ -696,37 +739,36 @@ async function whereUsed(id) {
   const lot = state.lots.find(l => l.id === id);
   try {
     const data = await api(`${base()}/lots/${id}/where-used`);
-    showDialog(`Where used · ${lot ? lot.code : ''}`, data.length
-      ? `<ul class="attn-list">${data.map(x => `<li><button type="button" class="attn-item" data-cmd="open-order" data-id="${x.order_id}"><span class="attn-icon tone-info">${icon('orders')}</span><span class="attn-text"><strong class="mono">${esc(x.order)}</strong><small>${fmt(x.quantity)} pcs issued</small></span>${badge(x.state)}${icon('chevR', 'chev')}</button></li>`).join('')}</ul>`
-      : empty('Not issued yet', 'This lot has not been allocated to any work order.', '', 'link'));
+    showDialog(t('whereUsed.title', {code: lot ? lot.code : ''}), data.length
+      ? `<ul class="attn-list">${data.map(x => `<li><button type="button" class="attn-item" data-cmd="open-order" data-id="${x.order_id}"><span class="attn-icon tone-info">${icon('orders')}</span><span class="attn-text"><strong class="mono">${esc(x.order)}</strong><small>${t('whereUsed.issued', {n: fmt(x.quantity)})}</small></span>${badge(x.state)}${icon('chevR', 'chev')}</button></li>`).join('')}</ul>`
+      : empty(t('whereUsed.empty.title'), t('whereUsed.empty.text'), '', 'link'));
   } catch (e) { toast(e.message, 'bad'); }
 }
 
 function newRoute() {
   const path = base();
-  formDialog('New route revision',
-    `<div class="form-grid form-grid-3">${field('Product code', `<input name="product" required ${CODE_PATTERN} maxlength="80" class="mono" placeholder="e.g. ASM-200" list="product-options">`)}${field('Revision', '<input name="revision" type="number" min="1" step="1" value="1" required inputmode="numeric">')}</div>
+  formDialog(t('newRoute.title'),
+    `<div class="form-grid form-grid-3">${field(t('newRoute.product'), `<input name="product" required ${codePattern()} maxlength="80" class="mono" placeholder="${t('newRoute.productPlaceholder')}" list="product-options">`)}${field(t('newRoute.revision'), '<input name="revision" type="number" min="1" step="1" value="1" required inputmode="numeric">')}</div>
      <datalist id="product-options">${[...new Set(state.routes.map(r => r.product))].map(p => `<option value="${esc(p)}"></option>`).join('')}</datalist>${materialsDatalist()}
-     ${field('Route name', '<input name="name" required maxlength="160" placeholder="e.g. Standard drive assembly">')}
-     <div class="builder"><div class="builder-head"><h3 class="section-label">Operations, in order</h3><button type="button" class="btn btn-ghost btn-sm" id="add-step">${icon('plus')}<span>Add operation</span></button></div><ol id="step-rows" class="builder-rows"></ol></div>
-     <div class="builder"><div class="builder-head"><h3 class="section-label">Bill of materials · per finished unit</h3><button type="button" class="btn btn-ghost btn-sm" id="add-bom">${icon('plus')}<span>Add material</span></button></div><ul id="bom-rows" class="builder-rows"></ul></div>`,
-    'Save revision',
+     ${field(t('newRoute.name'), `<input name="name" required maxlength="160" placeholder="${t('newRoute.namePlaceholder')}">`)}
+     <div class="builder"><div class="builder-head"><h3 class="section-label">${t('newRoute.ops')}</h3><button type="button" class="btn btn-ghost btn-sm" id="add-step">${icon('plus')}<span>${t('newRoute.addOp')}</span></button></div><ol id="step-rows" class="builder-rows"></ol></div>
+     <div class="builder"><div class="builder-head"><h3 class="section-label">${t('routes.bom')}</h3><button type="button" class="btn btn-ghost btn-sm" id="add-bom">${icon('plus')}<span>${t('newRoute.addMat')}</span></button></div><ul id="bom-rows" class="builder-rows"></ul></div>`,
+    t('newRoute.submit'),
     (f, key, form) => post(path + '/routes', {
       product: f.get('product').trim(), revision: Number(f.get('revision')), name: f.get('name').trim(),
       steps: $$('.step-input', form).map(row => ({name: $('[data-name]', row).value.trim(), work_center: $('[data-center]', row).value.trim()})),
       bom: $$('.bom-input', form).map(row => ({material: $('[data-material]', row).value.trim(), per_unit: Number($('[data-qty]', row).value), unit: 'pcs'})),
     }, key),
-    {size: 'dialog-wide', note: 'Saved revisions cannot be edited. Orders keep the revision they were created from.', onMount: form => {
+    {size: 'dialog-wide', note: t('newRoute.note'), onMount: form => {
       const renumber = () => $$('#step-rows .row-num').forEach((el, i) => { el.textContent = i + 1; });
       const row = kind => {
         const li = document.createElement('li');
         li.className = `builder-row ${kind}-input`;
         li.innerHTML = kind === 'step'
-          ? `<span class="row-num" aria-hidden="true"></span><input data-name aria-label="Operation name" placeholder="Operation name" required maxlength="160"><input data-center aria-label="Work center" placeholder="Work center" required maxlength="100" class="mono"><button type="button" class="btn btn-icon btn-ghost" aria-label="Remove operation">${icon('x')}</button>`
-          : `<input data-material aria-label="Material code" placeholder="Material code" ${CODE_PATTERN} required maxlength="80" list="material-options" class="mono"><input data-qty aria-label="Quantity per finished unit" placeholder="Qty / unit" type="number" min="1" step="1" required inputmode="numeric"><span class="unit">pcs</span><button type="button" class="btn btn-icon btn-ghost" aria-label="Remove material">${icon('x')}</button>`;
+          ? `<span class="row-num" aria-hidden="true"></span><input data-name aria-label="${t('newRoute.opName')}" placeholder="${t('newRoute.opName')}" required maxlength="160"><input data-center aria-label="${t('newRoute.workCenter')}" placeholder="${t('newRoute.workCenter')}" required maxlength="100" class="mono"><button type="button" class="btn btn-icon btn-ghost" aria-label="${t('newRoute.removeOp')}">${icon('x')}</button>`
+          : `<input data-material aria-label="${t('newRoute.matCode')}" placeholder="${t('newRoute.matCode')}" ${codePattern()} required maxlength="80" list="material-options" class="mono"><input data-qty aria-label="${t('newRoute.qtyPerUnit')}" placeholder="${t('newRoute.qtyPerUnitShort')}" type="number" min="1" step="1" required inputmode="numeric"><span class="unit">pcs</span><button type="button" class="btn btn-icon btn-ghost" aria-label="${t('newRoute.removeMat')}">${icon('x')}</button>`;
         $('button', li).onclick = () => {
-          const list = li.parentElement;
-          if (list.children.length > 1) { li.remove(); renumber(); } else toast(kind === 'step' ? 'A route needs at least one operation.' : 'A BOM needs at least one material.', 'bad');
+          if (li.parentElement.children.length > 1) { li.remove(); renumber(); } else toast(t(kind === 'step' ? 'toast.needOp' : 'toast.needMat'), 'bad');
         };
         $(kind === 'step' ? '#step-rows' : '#bom-rows').append(li); renumber();
         return li;
@@ -744,15 +786,18 @@ function newRoute() {
 async function showTrace(o) {
   if (!o) return;
   try {
-    const t = await api(`${base()}/orders/${o.id}/trace`);
-    const inputs = t.inputs.length
-      ? t.inputs.map(l => `<li class="trace-node"><span class="mono">${esc(l.lot)}</span><small>${esc(l.material)} · ${fmt(l.quantity)} ${esc(l.unit)}</small></li>`).join('')
-      : '<li class="trace-node trace-node-empty"><small>No materials issued yet</small></li>';
-    showDialog(`Traceability · ${o.code}`,
-      `<div class="trace-flow"><div><h3 class="section-label">Input lots</h3><ul class="trace-col">${inputs}</ul></div><span class="trace-arrow" aria-hidden="true">${icon('arrowR')}</span>
-        <div><h3 class="section-label">Work order</h3><ul class="trace-col"><li class="trace-node trace-node-main"><span class="mono">${esc(t.order.code)}</span><small>${esc(t.order.product)} · Rev ${t.order.revision}</small>${badge(t.order.state)}</li></ul></div><span class="trace-arrow" aria-hidden="true">${icon('arrowR')}</span>
-        <div><h3 class="section-label">Output lot</h3><ul class="trace-col"><li class="trace-node ${t.output_lot ? 'trace-node-ok' : 'trace-node-empty'}">${t.output_lot ? `<span class="mono">${esc(t.output_lot)}</span><small>${fmt(lastGood(t.order))} good pcs</small>` : '<small>Created when the order is closed</small>'}</li></ul></div></div>
-       <h3 class="section-label">Order history</h3>${t.events.length ? timeline(t.events.map(e => ({...e, entity: 'order', entity_id: o.id})), {details: false}) : '<p class="muted">No events.</p>'}`,
+    const tr = await api(`${base()}/orders/${o.id}/trace`);
+    const inputs = tr.inputs.length
+      ? tr.inputs.map(l => `<li class="trace-node"><span class="mono">${esc(l.lot)}</span><small>${esc(l.material)} · ${fmt(l.quantity)} ${esc(l.unit)}</small></li>`).join('')
+      : `<li class="trace-node trace-node-empty"><small>${t('trace.noInputs')}</small></li>`;
+    const output = tr.output_lot
+      ? `<span class="mono">${esc(tr.output_lot)}</span><small>${t('trace.goodPcs', {n: fmt(lastGood(tr.order))})}</small>`
+      : `<small>${t('trace.outputPending')}</small>`;
+    showDialog(t('trace.title', {code: o.code}),
+      `<div class="trace-flow"><div><h3 class="section-label">${t('trace.inputs')}</h3><ul class="trace-col">${inputs}</ul></div><span class="trace-arrow" aria-hidden="true">${icon('arrowR')}</span>
+        <div><h3 class="section-label">${t('trace.order')}</h3><ul class="trace-col"><li class="trace-node trace-node-main"><span class="mono">${esc(tr.order.code)}</span><small>${esc(tr.order.product)} · ${t('routes.rev', {rev: tr.order.revision})}</small>${badge(tr.order.state)}</li></ul></div><span class="trace-arrow" aria-hidden="true">${icon('arrowR')}</span>
+        <div><h3 class="section-label">${t('trace.output')}</h3><ul class="trace-col"><li class="trace-node ${tr.output_lot ? 'trace-node-ok' : 'trace-node-empty'}">${output}</li></ul></div></div>
+       <h3 class="section-label">${t('trace.history')}</h3>${tr.events.length ? timeline(tr.events.map(e => ({...e, entity: 'order', entity_id: o.id})), {details: false}) : `<p class="muted">${t('trace.noEvents')}</p>`}`,
       'dialog-wide');
   } catch (e) { toast(e.message, 'bad'); }
 }
@@ -760,22 +805,23 @@ async function showTrace(o) {
 function orderAction(order, action, operationId) {
   if (!order) return;
   const path = `${base()}/orders/${order.id}/actions`;
-  const title = {release: `Release ${order.code}`, record: 'Record output', hold: `Put ${order.code} on hold`, resume: `Resume ${order.code}`, quality: `Final inspection · ${order.code}`, complete: `Close ${order.code}`}[action];
+  const title = t(`action.${action}.title`, {code: order.code});
   const send = (body, key) => post(path, {action, version: order.version, ...body}, key);
+  const miniStat = (label, value) => `<span>${label}<strong>${value}</strong></span>`;
 
   if (action === 'release') {
     const route = routeOf(order);
-    if (!route) { toast('The route for this order is not available.', 'bad'); return; }
+    if (!route) { toast(t('toast.routeMissing'), 'bad'); return; }
     const sections = route.bom.map(b => {
       const need = b.per_unit * order.planned_qty;
       const lots = state.lots.filter(l => l.material === b.material && l.quality === 'released' && l.available > 0).sort((a, c) => a.id - c.id);
-      return `<fieldset class="alloc" data-need="${need}"><legend><span class="mono">${esc(b.material)}</span><span class="alloc-need">Need ${fmt(need)} pcs</span></legend>
+      return `<fieldset class="alloc" data-need="${need}"><legend><span class="mono">${esc(b.material)}</span><span class="alloc-need">${t('release.need', {n: fmt(need)})}</span></legend>
         <div class="alloc-status" aria-live="polite"></div>
-        ${lots.length ? lots.map(l => `<label class="alloc-row"><span><span class="mono">${esc(l.code)}</span><small>${fmt(l.available)} pcs available</small></span><input type="number" name="lot-${l.id}" data-lot="${l.id}" data-avail="${l.available}" min="0" max="${l.available}" step="1" value="0" inputmode="numeric" aria-label="Quantity from lot ${esc(l.code)}"></label>`).join('')
-          : `<p class="text-bad">${icon('alert')} No approved lots with stock. Receive and approve a lot first.</p>`}</fieldset>`;
+        ${lots.length ? lots.map(l => `<label class="alloc-row"><span><span class="mono">${esc(l.code)}</span><small>${t('release.available', {n: fmt(l.available)})}</small></span><input type="number" name="lot-${l.id}" data-lot="${l.id}" data-avail="${l.available}" min="0" max="${l.available}" step="1" value="0" inputmode="numeric" aria-label="${t('release.qtyFrom', {code: l.code})}"></label>`).join('')
+          : `<p class="text-bad">${icon('alert')} ${t('release.noLots')}</p>`}</fieldset>`;
     }).join('');
-    formDialog(title, `<p class="muted">Issue exactly ${fmt(order.planned_qty)} × BOM from QC-approved lots.</p><div class="alloc-tools"><button type="button" class="btn btn-secondary btn-sm" id="auto-alloc">${icon('refresh')}<span>Auto-allocate (oldest lots first)</span></button></div>${sections}`,
-      'Release order',
+    formDialog(title, `<p class="muted">${t('release.intro', {qty: fmt(order.planned_qty)})}</p><div class="alloc-tools"><button type="button" class="btn btn-secondary btn-sm" id="auto-alloc">${icon('refresh')}<span>${t('release.auto')}</span></button></div>${sections}`,
+      t('release.submit'),
       (f, key, form) => send({allocations: $$('[data-lot]', form).map(i => ({lot_id: Number(i.dataset.lot), quantity: Number(i.value) || 0})).filter(x => x.quantity > 0)}, key),
       {size: 'dialog-wide', onMount: form => {
         const submit = $('button[type=submit]', form);
@@ -783,7 +829,8 @@ function orderAction(order, action, operationId) {
           let allOk = true;
           $$('.alloc', form).forEach(fs => {
             const need = Number(fs.dataset.need), got = $$('[data-lot]', fs).reduce((s, i) => s + (Number(i.value) || 0), 0);
-            const st = got === need ? ['ok', `${icon('check')} Allocated ${fmt(got)} of ${fmt(need)}`] : got < need ? ['warn', `${icon('alert')} Allocated ${fmt(got)} of ${fmt(need)} · ${fmt(need - got)} short`] : ['bad', `${icon('alert')} Allocated ${fmt(got)} of ${fmt(need)} · ${fmt(got - need)} too many`];
+            const p = {got: fmt(got), need: fmt(need), diff: fmt(Math.abs(need - got))};
+            const st = got === need ? ['ok', `${icon('check')} ${t('release.ok', p)}`] : got < need ? ['warn', `${icon('alert')} ${t('release.short', p)}`] : ['bad', `${icon('alert')} ${t('release.over', p)}`];
             if (got !== need) allOk = false;
             const el = $('.alloc-status', fs); el.className = `alloc-status text-${st[0]}`; el.innerHTML = st[1];
           });
@@ -803,45 +850,51 @@ function orderAction(order, action, operationId) {
     if (!op) return;
     const cap = capacityOf(order, i), used = op.good + op.scrap, rem = cap - used;
     formDialog(title,
-      `<div class="dialog-summary"><span class="timeline-icon tone-violet">${icon('tool')}</span><div><strong>${esc(op.name)}</strong><small>${esc(order.code)} · ${esc(op.work_center)} · operation ${op.sequence} of ${order.operations.length}</small></div></div>
-       <div class="mini-stats"><span>Input<strong>${fmt(cap)}</strong></span><span>Recorded<strong>${fmt(used)}</strong></span><span>Remaining<strong>${fmt(rem)}</strong></span></div>
-       <div class="form-grid">${field('Good (pcs)', `<input name="good" type="number" min="0" max="${Math.max(rem, 0)}" step="1" value="0" required inputmode="numeric">`)}${field('Scrap (pcs)', `<input name="scrap" type="number" min="0" max="${Math.max(rem, 0)}" step="1" value="0" required inputmode="numeric">`)}</div>
-       ${rem > 0 ? `<button type="button" class="btn btn-ghost btn-sm fill-btn" id="fill-good">${icon('check')}<span>Record all ${fmt(rem)} remaining as good</span></button>` : ''}
-       ${field('Scrap reason / notes', '<textarea name="reason" maxlength="500" rows="2" placeholder="Required when scrap is recorded"></textarea>')}
-       <label class="check"><input name="finish" type="checkbox" ${rem === 0 ? 'checked' : ''}><span><strong>Finish this operation</strong><small>Moves good units to the next step. Requires the full input to be recorded.</small></span></label>
+      `<div class="dialog-summary"><span class="timeline-icon tone-violet">${icon('tool')}</span><div><strong>${esc(op.name)}</strong><small>${t('record.summary', {code: order.code, wc: op.work_center, seq: op.sequence, total: order.operations.length})}</small></div></div>
+       <div class="mini-stats">${miniStat(t('op.input'), fmt(cap))}${miniStat(t('record.recorded'), fmt(used))}${miniStat(t('op.remaining'), fmt(rem))}</div>
+       <div class="form-grid">${field(t('record.good'), `<input name="good" type="number" min="0" max="${Math.max(rem, 0)}" step="1" value="0" required inputmode="numeric">`)}${field(t('record.scrap'), `<input name="scrap" type="number" min="0" max="${Math.max(rem, 0)}" step="1" value="0" required inputmode="numeric">`)}</div>
+       ${rem > 0 ? `<button type="button" class="btn btn-ghost btn-sm fill-btn" id="fill-good">${icon('check')}<span>${t('record.fill', {n: fmt(rem)})}</span></button>` : ''}
+       ${field(t('record.reason'), `<textarea name="reason" maxlength="500" rows="2" placeholder="${t('record.reasonPlaceholder')}"></textarea>`)}
+       <label class="check"><input name="finish" type="checkbox" ${rem === 0 ? 'checked' : ''}><span><strong>${t('record.finish')}</strong><small>${t('record.finish.text')}</small></span></label>
        <p class="live-summary" aria-live="polite"></p>`,
-      'Save record',
+      t('record.submit'),
       (f, key) => send({operation_id: op.id, good: Number(f.get('good')) || 0, scrap: Number(f.get('scrap')) || 0, finish: f.has('finish'), reason: f.get('reason') || ''}, key),
       {onMount: form => {
         let finishTouched = false;
-        form.finish.addEventListener('change', () => { finishTouched = true; update(); });
         const update = () => {
           const g = Number(form.good.value) || 0, s = Number(form.scrap.value) || 0, after = used + g + s;
           form.reason.required = s > 0;
           if (!finishTouched) form.finish.checked = after === cap;
-          const msg = $('.live-summary', form);
-          if (after > cap) { msg.className = 'live-summary text-bad'; msg.textContent = `Too much: ${fmt(after)} would exceed the input of ${fmt(cap)}.`; }
-          else if (form.finish.checked && after < cap) { msg.className = 'live-summary text-warn'; msg.textContent = `${fmt(cap - after)} pcs still unrecorded — the operation can only be finished at ${fmt(cap)}.`; }
-          else { msg.className = 'live-summary muted'; msg.textContent = `After saving: ${fmt(after)} of ${fmt(cap)} recorded${form.finish.checked ? ' · operation finished' : ''}.`; }
+          const msg = $('.live-summary', form), p = {after: fmt(after), cap: fmt(cap), left: fmt(cap - after)};
+          if (after > cap) { msg.className = 'live-summary text-bad'; msg.innerHTML = t('record.over', p); }
+          else if (form.finish.checked && after < cap) { msg.className = 'live-summary text-warn'; msg.innerHTML = t('record.short', p); }
+          else { msg.className = 'live-summary muted'; msg.innerHTML = t(form.finish.checked ? 'record.afterFinish' : 'record.after', p); }
         };
+        form.finish.addEventListener('change', () => { finishTouched = true; update(); });
         $('#fill-good', form)?.addEventListener('click', () => { form.good.value = rem; form.scrap.value = 0; update(); });
         form.addEventListener('input', update); update();
       }});
   } else if (action === 'quality') {
     formDialog(title,
-      `<div class="mini-stats"><span>Planned<strong>${fmt(order.planned_qty)}</strong></span><span>Good output<strong>${fmt(lastGood(order))}</strong></span><span>Scrap<strong>${fmt(scrapOf(order))}</strong></span></div>` +
-      decisionPicker('decision', [['pass', 'Pass', 'Order can be closed', 'ok'], ['fail', 'Fail', 'Order goes on hold', 'bad']]) +
-      field('Inspection notes', '<textarea name="reason" required minlength="3" maxlength="500" rows="3" placeholder="Checks performed, results, report reference…"></textarea>'),
-      'Save inspection', (f, key) => send({decision: f.get('decision'), reason: f.get('reason')}, key));
+      `<div class="mini-stats">${miniStat(t('detail.planned'), fmt(order.planned_qty))}${miniStat(t('detail.good'), fmt(lastGood(order)))}${miniStat(t('detail.scrap'), fmt(scrapOf(order)))}</div>` +
+      decisionPicker('decision', [['pass', t('qc.pass'), t('qc.pass.text'), 'ok'], ['fail', t('qc.fail'), t('qc.fail.text'), 'bad']]) +
+      field(t('form.inspectionNotes'), `<textarea name="reason" required minlength="3" maxlength="500" rows="3" placeholder="${t('qc.placeholder')}"></textarea>`),
+      t('qc.submit'), (f, key) => send({decision: f.get('decision'), reason: f.get('reason')}, key));
   } else {
     const short = action === 'complete' && lastGood(order) < order.planned_qty;
-    const label = action === 'complete' ? 'Closing note' : action === 'hold' ? 'Reason for hold' : 'Corrective action taken';
     const required = action !== 'complete' || short;
+    const hint = short ? t('close.shortHint', {n: fmt(order.planned_qty - lastGood(order))}) : required ? t('form.min3') : t('form.optional');
     formDialog(title,
-      (action === 'complete' ? `<div class="mini-stats"><span>Planned<strong>${fmt(order.planned_qty)}</strong></span><span>Good output<strong>${fmt(lastGood(order))}</strong></span><span>Output lot<strong class="mono">${esc(order.code)}</strong></span></div>` : '') +
-      field(label, `<textarea name="reason" ${required ? 'required minlength="3"' : ''} maxlength="500" rows="3"></textarea>`, short ? `Output is ${fmt(order.planned_qty - lastGood(order))} pcs short of plan, so a note is required.` : required ? 'At least 3 characters.' : 'Optional.'),
-      {hold: 'Put on hold', resume: 'Resume order', complete: 'Close order'}[action],
+      (action === 'complete' ? `<div class="mini-stats">${miniStat(t('detail.planned'), fmt(order.planned_qty))}${miniStat(t('detail.good'), fmt(lastGood(order)))}${miniStat(t('close.outputLot'), `<span class="mono">${esc(order.code)}</span>`)}</div>` : '') +
+      field(t(`action.${action}.label`), `<textarea name="reason" ${required ? 'required minlength="3"' : ''} maxlength="500" rows="3"></textarea>`, hint),
+      t(`action.${action}.submit`),
       (f, key) => send({reason: f.get('reason') || ''}, key),
-      {note: action === 'complete' ? 'A closed order cannot be changed.' : action === 'hold' ? 'Production stops until a quality user resumes the order.' : ''});
+      {note: hasKey(`action.${action}.note`) ? t(`action.${action}.note`) : ''});
   }
 }
+
+// ---------- boot ----------
+syncLangLabels();
+applyStatic();
+renderNav();
+applyTheme(storedTheme());
