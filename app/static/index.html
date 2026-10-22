@@ -1,14 +1,71 @@
 <!doctype html>
-<html lang="vi">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MES · Điều hành sản xuất</title><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>MES · Production Operations</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/i18n.js" defer></script>
+<script src="/static/app.js" defer></script>
+</head>
 <body>
-<section id="login-screen" class="login-screen">
-  <div class="login-intro"><div class="wordmark">M<span>·</span>ES <small>OPERATIONS PLATFORM</small></div><p class="eyebrow">TỪ KẾ HOẠCH ĐẾN THÀNH PHẨM</p><h1>Mỗi công đoạn.<br>Một nguồn dữ liệu.</h1><p>Theo dõi sản xuất, chất lượng và nguyên vật liệu trên cùng một nền tảng cho nhiều nhà máy.</p><div class="intro-line"><span>01 / Điều hành</span><span>02 / Chất lượng</span><span>03 / Truy xuất</span></div></div>
-  <form id="login-form" class="login-card"><div class="eyebrow">KHÔNG GIAN LÀM VIỆC</div><h2>Đăng nhập MES</h2><p>Sử dụng tài khoản được quản trị viên cấp.</p><label>Tên đăng nhập<input name="username" autocomplete="username" required maxlength="80"></label><label>Mật khẩu<input name="password" type="password" autocomplete="current-password" required maxlength="256"></label><button class="primary" type="submit">Vào hệ thống →</button><p id="login-error" role="alert" class="error"></p><small>Bản nền tảng 0.1 · Cần nghiệm thu trước vận hành thực tế.</small></form>
+<section id="login-screen" class="login">
+  <div class="login-brand">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l6 4V10l6 4V6h6v15z"/></svg></span><span class="brand-name">MES<small data-i18n="shell.operations">Operations</small></span></div>
+    <div class="login-copy">
+      <p class="eyebrow" data-i18n="login.eyebrow">From plan to finished goods</p>
+      <h1 data-i18n-html="login.headline">Every operation.<br>One source of truth.</h1>
+      <p data-i18n="login.lede">Plan, run, inspect and trace discrete production across all of your plants.</p>
+      <ul class="login-points">
+        <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg><span data-i18n="login.point1">Work orders from release to close</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg><span data-i18n="login.point2">Material lots with quality gates</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg><span data-i18n="login.point3">Lot genealogy and a tamper-proof audit trail</span></li>
+      </ul>
+    </div>
+    <p class="login-foot" data-i18n="login.foot">Foundation release 0.1 · Validate before production use</p>
+  </div>
+  <div class="login-panel">
+    <form id="login-form" class="login-card">
+      <div class="login-card-head">
+        <h2 data-i18n="login.title">Sign in</h2>
+        <label class="lang-switch"><span class="sr-only" data-i18n="shell.language">Language</span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><select class="lang-select"><option value="en">English</option><option value="zh-TW">繁體中文</option></select></label>
+      </div>
+      <p class="muted" data-i18n="login.help">Use the account provided by your administrator.</p>
+      <label class="field"><span data-i18n="login.username">Username</span><input name="username" autocomplete="username" required maxlength="80" autocapitalize="none" spellcheck="false"></label>
+      <label class="field"><span data-i18n="login.password">Password</span><input name="password" type="password" autocomplete="current-password" required maxlength="256"></label>
+      <p id="login-error" role="alert" class="form-error"></p>
+      <button class="btn btn-primary btn-block" type="submit" data-i18n="login.submit">Sign in</button>
+    </form>
+  </div>
 </section>
-<div id="workspace" class="workspace" hidden>
-  <aside><div class="wordmark">M<span>·</span>ES <small>OPERATIONS</small></div><p class="nav-label">ĐIỀU HÀNH</p><nav aria-label="Điều hướng chính"><button data-page="overview" class="active">◫ <span>Tổng quan</span></button><button data-page="orders">▤ <span>Lệnh sản xuất</span></button><button data-page="lots">▦ <span>Nguyên vật liệu</span></button><button data-page="routes">⇄ <span>Quy trình & BOM</span></button><button data-page="audit">◷ <span>Nhật ký hoạt động</span></button></nav><div class="aside-footer"><span class="status-dot"></span> MES Foundation <small>Discrete manufacturing · v0.1</small></div></aside>
-  <div class="main"><header><div><span class="header-label">NHÀ MÁY</span><select id="plant-select" aria-label="Chọn nhà máy"></select></div><div class="account"><span id="user-label"></span><button id="logout" class="quiet">Đăng xuất</button></div></header><div class="notice">Bản nền tảng để kiểm thử và nghiệm thu • Chưa kết nối ERP hoặc thiết bị sản xuất</div><main id="content" tabindex="-1"></main></div>
+
+<div id="workspace" class="app" hidden>
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l6 4V10l6 4V6h6v15z"/></svg></span><span class="brand-name">MES<small data-i18n="shell.operations">Operations</small></span></div>
+    <nav id="nav" class="nav" aria-label="Primary" data-i18n-attr="aria-label:shell.primaryNav"></nav>
+    <div class="sidebar-foot"><span class="dot" aria-hidden="true"></span><span><span data-i18n="shell.footName">MES Foundation</span><small data-i18n="shell.footSub">Discrete manufacturing · v0.1</small></span></div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <label class="plant-switch"><span class="sr-only" data-i18n="shell.plant">Plant</span><span class="plant-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l6 4V10l6 4V6h6v15z"/></svg></span><select id="plant-select"></select></label>
+      <span class="env-pill" data-i18n="shell.env" data-i18n-attr="title:shell.envTitle" title="Not connected to ERP or shop-floor equipment">Test environment</span>
+      <div class="topbar-right">
+        <label class="lang-switch"><span class="sr-only" data-i18n="shell.language">Language</span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><select class="lang-select"><option value="en">English</option><option value="zh-TW">繁體中文</option></select></label>
+        <button id="theme-toggle" class="btn btn-icon btn-ghost" type="button" aria-label="Switch color theme"></button>
+        <div class="user-chip"><span id="user-avatar" class="avatar" aria-hidden="true"></span><span class="user-text"><strong id="user-name"></strong><small id="user-role"></small></span></div>
+        <button id="logout" class="btn btn-icon btn-ghost" type="button" aria-label="Sign out" title="Sign out" data-i18n-attr="aria-label:shell.signOut;title:shell.signOut"><svg viewBox="0 0 24 24" class="icon" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h3"/><path d="m16 17 5-5-5-5M21 12H9"/></svg></button>
+      </div>
+    </header>
+    <div id="loading-bar" class="loading-bar" hidden></div>
+    <main id="content" tabindex="-1"></main>
+  </div>
 </div>
-<dialog id="dialog"><div class="dialog-head"><h2 id="dialog-title"></h2><button id="close-dialog" class="quiet" aria-label="Đóng">✕</button></div><div id="dialog-body"></div></dialog><div id="toast" role="status" hidden></div>
-</body></html>
+
+<dialog id="dialog" aria-labelledby="dialog-title">
+  <div class="dialog-head"><h2 id="dialog-title"></h2><button id="close-dialog" class="btn btn-icon btn-ghost" type="button" aria-label="Close" data-i18n-attr="aria-label:shell.close"><svg viewBox="0 0 24 24" class="icon" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <div id="dialog-body"></div>
+</dialog>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
