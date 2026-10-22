@@ -534,7 +534,7 @@ dialog::backdrop { background: rgba(10, 15, 25, .5); backdrop-filter: blur(2px);
   .table-cards td .cell-main { display: inline; }
   .table-cards td .cell-sub { display: inline; }
   .table-cards td .progress-cell { flex: 1; }
-  .table-cards td[data-label="Order"] .cell-sub { flex-basis: 100%; padding-left: 106px; margin-top: -4px; }
+  .table-cards td[data-col="order"] .cell-sub { flex-basis: 100%; padding-left: 106px; margin-top: -4px; }
   .table-cards .cell-chev { display: none; }
   .table-cards .cell-actions { display: flex; justify-content: flex-start; padding-top: 10px; margin-top: 4px; border-top: 1px solid var(--border); }
   .table-cards .progress-cell { min-width: 0; }
