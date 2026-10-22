@@ -1,7 +1,7 @@
 /* MES Operations — design tokens, light + dark. No external assets (CSP default-src 'self'). */
 :root {
   color-scheme: light;
-  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   --bg: #f4f6f9; --surface: #ffffff; --surface-2: #f8f9fb; --sunken: #eef1f5;
   --border: #e1e5eb; --border-strong: #c9d0da;
@@ -454,6 +454,16 @@ dialog::backdrop { background: rgba(10, 15, 25, .5); backdrop-filter: blur(2px);
 :root[data-theme="dark"] .toast .icon { color: #15803d; }
 :root[data-theme="dark"] .toast.tone-bad .icon { color: #b42318; }
 
+/* ---------- language switch ---------- */
+.lang-switch { position: relative; display: flex; align-items: center; }
+.lang-switch .icon { position: absolute; left: 10px; width: 17px; height: 17px; color: var(--muted); pointer-events: none; }
+.lang-switch select { width: auto; min-height: 36px; padding: 6px 30px 6px 33px; font-size: 13.5px; font-weight: 600; background-color: transparent; border-color: var(--border); background-position: calc(100% - 15px) 52%, calc(100% - 10px) 52%; }
+.lang-switch select:hover { background-color: var(--sunken); }
+.login-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+/* CJK text: tracking meant for Latin uppercase labels looks loose in Chinese. */
+:root[lang^="zh"] .eyebrow, :root[lang^="zh"] .section-label, :root[lang^="zh"] .table th, :root[lang^="zh"] .timeline-day, :root[lang^="zh"] .brand-name small { letter-spacing: .04em; }
+:root[lang^="zh"] .page-title h1, :root[lang^="zh"] .login-copy h1 { letter-spacing: 0; }
+
 /* ---------- responsive ---------- */
 @media (max-width: 1240px) {
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -492,7 +502,8 @@ dialog::backdrop { background: rgba(10, 15, 25, .5); backdrop-filter: blur(2px);
   .nav-short { display: block; }
   .nav-count { top: 2px; right: calc(50% - 26px); }
   .topbar { height: 58px; padding: 0 12px; gap: 8px; }
-  .env-pill, .user-text { display: none; }
+  .env-pill, .user-chip { display: none; }
+  .lang-switch select { padding-left: 30px; padding-right: 26px; font-size: 13px; }
   .user-chip { padding: 0; margin: 0; }
   .plant-switch { flex: 1; min-width: 0; }
   .plant-switch select { width: 100%; max-width: none; font-size: 14px; }
