@@ -202,14 +202,14 @@ def create_app(engine=None):
     @app.get("/api/plants/{plant_id}/orders")
     def orders(plant_id: int, user=Depends(current_user, scope="function"), db=Depends(db_session, scope="function")):
         access(db, user, plant_id)
-        orders = db.scalars(select(WorkOrder).where(WorkOrder.plant_id == plant_id).order_by(WorkOrder.id.desc()).limit(500)).all()
-        if not orders:
+        order_rows = db.scalars(select(WorkOrder).where(WorkOrder.plant_id == plant_id).order_by(WorkOrder.id.desc()).limit(500)).all()
+        if not order_rows:
             return []
-        operations_by_order = {order.id: [] for order in orders}
-        operations = db.scalars(select(Operation).where(Operation.order_id.in_(operations_by_order)).order_by(Operation.sequence))
+        operations_by_order = {order.id: [] for order in order_rows}
+        operations = db.scalars(select(Operation).where(Operation.order_id.in_(list(operations_by_order))).order_by(Operation.sequence))
         for operation in operations:
             operations_by_order[operation.order_id].append(operation)
-        return [order_data(db, order, operations_by_order[order.id]) for order in orders]
+        return [order_data(db, order, operations_by_order[order.id]) for order in order_rows]
 
     @app.post("/api/plants/{plant_id}/orders", status_code=201)
     def add_order(plant_id: int, data: OrderInput, request: Request, idempotency_key: str = Header(default=""), user=Depends(current_user, scope="function"), db=Depends(db_session, scope="function")):

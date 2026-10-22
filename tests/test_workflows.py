@@ -339,6 +339,8 @@ def test_query_indexes_and_reversible_migration(env):
         for table, (name, columns) in expected.items():
             indexes = {index['name']: index['column_names'] for index in inspect(engine).get_indexes(table)}
             assert indexes[name] == columns
+            if table == 'audit_events':
+                assert indexes['ix_audit_events_plant_id'] == ['plant_id']
 
     def migrate(direction):
         script = Path(__file__).parents[1] / 'migrations' / f'001_query_indexes.{direction}.sql'
@@ -352,6 +354,7 @@ def test_query_indexes_and_reversible_migration(env):
     migrate('down')  # Downgrade is idempotent too.
     for table, (name, _) in expected.items():
         assert name not in {index['name'] for index in inspect(engine).get_indexes(table)}
+    assert 'ix_audit_events_plant_id' in {index['name'] for index in inspect(engine).get_indexes('audit_events')}
     migrate('up')
     migrate('up')
     assert_indexes_present()
