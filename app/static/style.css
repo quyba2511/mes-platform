@@ -494,7 +494,7 @@ dialog::backdrop { background: rgba(10, 15, 25, .5); backdrop-filter: blur(2px);
   .app { display: block; }
   .sidebar { position: fixed; inset: auto 0 0 0; top: auto; height: auto; flex-direction: row; padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); border-right: 0; border-top: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(10px); }
   .sidebar .brand { display: none; }
-  .nav { grid-template-columns: repeat(5, minmax(0, 1fr)); width: 100%; gap: 2px; }
+  .nav { grid-template-columns: repeat(6, minmax(0, 1fr)); width: 100%; gap: 2px; }
   .nav-item { flex-direction: column; justify-content: center; gap: 3px; width: 100%; height: 56px; padding: 6px 2px; border-radius: 10px; font-size: 11.5px; }
   .nav-item.active { background: transparent; }
   .nav-item.active .icon { background: var(--accent-soft); border-radius: 99px; padding: 3px 14px; width: 50px; height: 28px; }
@@ -572,3 +572,7 @@ dialog::backdrop { background: rgba(10, 15, 25, .5); backdrop-filter: blur(2px);
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Fuburg work queues */
+.fb-kpi{padding:20px;display:flex;flex-direction:column;gap:12px}.fb-kpi strong{font-size:32px}.fb-toolbar{display:flex;flex-wrap:wrap;gap:10px;margin:24px 0}.fb-sub{display:block;color:var(--muted);margin-top:5px}.fb-sync{display:flex;flex-wrap:wrap;gap:16px;padding:20px}.fb-history{list-style:none;padding:0 20px 20px;margin:0}.fb-history li{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--border)}.fb-history span{font-size:12px;color:var(--muted)}#fb-plan{margin-top:20px}#fb-plan button{margin-top:20px}
+@media(max-width:760px){.nav{overflow-x:auto}.nav-item{min-width:58px}.fb-history li{flex-direction:column;gap:4px}}
