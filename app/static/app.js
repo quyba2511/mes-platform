@@ -121,6 +121,8 @@ const SERVER_ERRORS = {
   'Dữ liệu trùng hoặc xung đột. Tải lại trước khi thử lại.': 'conflict',
 };
 const translate = msg => (SERVER_ERRORS[String(msg).trim()] ? t(`err.${SERVER_ERRORS[String(msg).trim()]}`) : msg);
+/* Coded errors ({code, message}) come from the Fuburg module; known codes are translated, others show the server message. */
+const codedError = d => (d.code && hasKey(`fb.err.${d.code}`) ? t(`fb.err.${d.code}`) : d.message || d.code);
 
 // ---------- state ----------
 const state = {
@@ -131,7 +133,7 @@ const state = {
 let loadGeneration = 0;
 const can = (...roles) => state.plant?.role === 'admin' || roles.includes(state.plant?.role);
 const base = () => `/api/plants/${state.plant.id}`;
-const NAV = [['overview', 'overview'], ['orders', 'orders'], ['lots', 'lots'], ['routes', 'routes'], ['audit', 'audit']];
+const NAV = [['overview', 'overview'], ['fuburg', 'tool'], ['orders', 'orders'], ['lots', 'lots'], ['routes', 'routes'], ['audit', 'audit']];
 
 // ---------- time ----------
 const parseTime = v => new Date(/(?:Z|[+-]\d\d:\d\d)$/.test(v) ? v : v + 'Z');
@@ -165,7 +167,7 @@ async function api(path, options = {}) {
     if (response.status === 401 && path !== '/api/login') logoutLocal();
     const detail = Array.isArray(data.detail)
       ? data.detail.map(x => `${(x.loc || []).slice(1).join('.') || 'input'}: ${x.msg}`).join('; ')
-      : translate(data.detail);
+      : data.detail && typeof data.detail === 'object' ? codedError(data.detail) : translate(data.detail);
     throw new Error(detail || t('err.status', {status: response.status}));
   }
   return data;
@@ -323,7 +325,7 @@ $('#login-form').onsubmit = async event => {
 
 $('#plant-select').onchange = () => {
   state.plant = state.plants.find(p => p.id === Number($('#plant-select').value));
-  state.detail = null; load();
+  state.detail = null; state.fuburg = null; if ($('#dialog').open) $('#dialog').close(); load();
 };
 $('#close-dialog').onclick = () => $('#dialog').close();
 
@@ -338,9 +340,10 @@ async function load() {
   if (switching) $('#content').innerHTML = skeleton();
   setLoading(true);
   try {
-    const [orders, routes, lots, audit] = await Promise.all([api(path + '/orders'), api(path + '/routes'), api(path + '/lots'), api(path + '/audit')]);
+    const [orders, routes, lots, audit, fuburg] = await Promise.all([api(path + '/orders'), api(path + '/routes'), api(path + '/lots'), api(path + '/audit'), api(path + '/fuburg')]);
     if (generation !== loadGeneration) return;
-    Object.assign(state, {orders, routes, lots, audit, auditDone: audit.length < 100, loadedPlant: state.plant.id});
+    Object.assign(state, {orders, routes, lots, audit, fuburg, auditDone: audit.length < 100, loadedPlant: state.plant.id});
+    if (switching && fuburg.enabled && state.page === 'overview') state.page = 'fuburg';
     render();
   } catch (error) {
     if (generation !== loadGeneration) return;
@@ -400,7 +403,7 @@ function render() {
   updateChrome();
   if (!state.plant) return;
   if (state.detail) { renderDetail(); return; }
-  ({overview: renderOverview, orders: renderOrders, lots: renderLots, routes: renderRoutes, audit: renderAudit})[state.page]();
+  ({overview: renderOverview, fuburg: renderFuburg, orders: renderOrders, lots: renderLots, routes: renderRoutes, audit: renderAudit})[state.page]();
   applyWidths($('#content'));
 }
 
