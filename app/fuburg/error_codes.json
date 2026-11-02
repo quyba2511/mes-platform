@@ -1,0 +1,863 @@
+[
+ {
+  "code": "INVALID_REQUEST",
+  "action": "全部",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "body 不是 JSON，或 plant 不是 4 位數字"
+ },
+ {
+  "code": "PLANT_ACCESS_DENIED",
+  "action": "全部",
+  "category": "PERMISSION",
+  "category_zh": "權限",
+  "meaning": "呼叫帳號未登記此工廠＋通道（cfg.principal_scope）"
+ },
+ {
+  "code": "PLANT_DISABLED",
+  "action": "全部",
+  "category": "PERMISSION",
+  "category_zh": "權限",
+  "meaning": "工廠未啟用（cfg.plant.enabled = 0）"
+ },
+ {
+  "code": "LOCK_TIMEOUT",
+  "action": "全部",
+  "category": "RETRY",
+  "category_zh": "重送",
+  "meaning": "10 秒內取不到工廠鎖；原內容稍後重送"
+ },
+ {
+  "code": "UNKNOWN_ACTION",
+  "action": "全部",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "動作名稱不存在"
+ },
+ {
+  "code": "INVALID_ORDER_KEY",
+  "action": "publish_order",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "order_no 不是 12 位數字，或 source_version 不是正整數"
+ },
+ {
+  "code": "ORDER_VERSION_CONFLICT",
+  "action": "publish_order",
+  "category": "CONFLICT",
+  "category_zh": "衝突",
+  "meaning": "同一工單同一版本，內容與已收到的不同；SAP 須遞增版本"
+ },
+ {
+  "code": "STALE_ORDER_VERSION",
+  "action": "publish_order",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "版本比中介庫已有的舊，不採用"
+ },
+ {
+  "code": "UNKNOWN_SITE",
+  "action": "publish_order",
+  "category": "PERMISSION",
+  "category_zh": "權限",
+  "meaning": "對應不到場區：未帶 site 且主工作中心未登記於 cfg.site_work_center，或場區未啟用"
+ },
+ {
+  "code": "INVALID_MATERIAL",
+  "action": "publish_order、publish_master",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "物料欄位缺漏或超長（料號、說明、基本單位、物料類型、batch_managed、source_version）"
+ },
+ {
+  "code": "STALE_MATERIAL_VERSION",
+  "action": "publish_order、publish_master",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "物料版本比已有的舊"
+ },
+ {
+  "code": "MATERIAL_VERSION_CONFLICT",
+  "action": "publish_order、publish_master",
+  "category": "CONFLICT",
+  "category_zh": "衝突",
+  "meaning": "同一料號同一版本，內容不同"
+ },
+ {
+  "code": "BASE_UOM_RATE_MISSING",
+  "action": "publish_order、publish_master",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "uoms 沒有基本單位 1:1 的換算"
+ },
+ {
+  "code": "OPERATIONS_REQUIRED",
+  "action": "publish_order",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "工單沒有作業（operations 為空）"
+ },
+ {
+  "code": "INVALID_ORDER_UOM_RATE",
+  "action": "publish_order",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "order_uom_numerator／denominator 只帶一個、非正整數或超出範圍"
+ },
+ {
+  "code": "ORDER_UOM_RATE_MISMATCH",
+  "action": "publish_order",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "planned_qty × 分子 ≠ planned_pieces × 分母"
+ },
+ {
+  "code": "ORDER_UOM_RATE_CHANGED",
+  "action": "publish_order",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "同一工單前後版本的 AFPO 換算不同（工單換算應固定）"
+ },
+ {
+  "code": "INVALID_MASTER",
+  "action": "publish_master",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "materials 為空或超過 500 筆；uoms 為空或超過 2000 筆"
+ },
+ {
+  "code": "INVALID_UOM",
+  "action": "publish_master",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "單位資料格式錯誤、重複，或文字語言不是 M／E"
+ },
+ {
+  "code": "DUPLICATE_UOM",
+  "action": "publish_master（uom）",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "同一批內單位代碼重複"
+ },
+ {
+  "code": "DUPLICATE_MATERIAL",
+  "action": "publish_master（material）",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "同一批內料號重複"
+ },
+ {
+  "code": "MASTER_KIND_NOT_SUPPORTED",
+  "action": "publish_master",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "kind 不是 material 或 uom"
+ },
+ {
+  "code": "INVALID_UUID",
+  "action": "多個動作",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "UUID 格式錯誤，或兩個 ID 相同（例 completion_id = pp_txn_id）"
+ },
+ {
+  "code": "SOURCE_REQUIRED",
+  "action": "submit_completion、submit_goods_movement、cancel_document",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "缺 source_system、source_record_id（物料移動另需 actor）"
+ },
+ {
+  "code": "SOURCE_CONFLICT_REQUIRES_SAP_CORRECTION",
+  "action": "submit_completion、submit_goods_movement、cancel_document",
+  "category": "CONFLICT",
+  "category_zh": "衝突",
+  "meaning": "同一來源單號已送過且內容不同；不可改內容重送，須作廢後以新來源單號送，或走更正"
+ },
+ {
+  "code": "SAP_RULES_OR_EXPLICIT_GR_NOT_APPROVED",
+  "action": "submit_completion、submit_goods_movement、decide_receipt",
+  "category": "PERMISSION",
+  "category_zh": "權限",
+  "meaning": "工廠尚未開放（rules_approved = 1 且 receipt_mode = EXPLICIT）"
+ },
+ {
+  "code": "ORDER_NOT_OPEN_OR_SITE_MISMATCH",
+  "action": "submit_completion",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "工單未下達、已結案、已刪除，或 site 與工單不符"
+ },
+ {
+  "code": "ORDER_VERSION_MISMATCH",
+  "action": "submit_completion、submit_receipt",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "有帶 order_version 但與中介庫目前版本不同"
+ },
+ {
+  "code": "ORDER_UPDATE_PENDING",
+  "action": "submit_completion、submit_receipt",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "未帶 order_version，且此工單有尚未 ack 的 ORDER 事件；先處理事件"
+ },
+ {
+  "code": "SITE_DISABLED",
+  "action": "報工、放行、包裝、繳庫",
+  "category": "PERMISSION",
+  "category_zh": "權限",
+  "meaning": "場區已停用"
+ },
+ {
+  "code": "UOM_VERSION_MISMATCH",
+  "action": "submit_completion",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "有帶 uom_version 但與物料目前版本不同"
+ },
+ {
+  "code": "PIECE_RANGE_OR_INTEGER_REQUIRED",
+  "action": "submit_completion",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "good_pieces 須為 1～999,999,999 的整數；scrap_pieces 須為 0 以上整數"
+ },
+ {
+  "code": "INVALID_TIME_PRECISION",
+  "action": "submit_completion",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "machine_minutes 缺漏、負數或超過小數 3 位"
+ },
+ {
+  "code": "REPORT_APPROVAL_REQUIRED",
+  "action": "submit_completion",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "缺 grade_rule_ref、approved_by 或 approval_ref"
+ },
+ {
+  "code": "GRADES_REQUIRED",
+  "action": "submit_completion",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "grades 為空"
+ },
+ {
+  "code": "GRADE_RULE_NOT_APPROVED",
+  "action": "submit_completion",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "等級＋處置的組合不在已核准的分級規則內"
+ },
+ {
+  "code": "INVALID_GRADE",
+  "action": "submit_completion",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "pieces 非整數，或 disposition 不是 GOOD／SCRAP／REWORK／AY"
+ },
+ {
+  "code": "GRADE_BALANCE_MISMATCH",
+  "action": "submit_completion",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "GOOD 合計 ≠ good_pieces，或 SCRAP 合計 ≠ scrap_pieces"
+ },
+ {
+  "code": "LABOR_PRECISION",
+  "action": "submit_completion",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "labor_minutes 超過小數 3 位"
+ },
+ {
+  "code": "V2_REPORT_ONLY",
+  "action": "submit_completion",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "報工不可同時帶 receipt、packaging 或 gr_txn_id（放行、包裝、繳庫各自呼叫）"
+ },
+ {
+  "code": "COMPLETION_NOT_FOUND",
+  "action": "放行、包裝、繳庫、核准、更正、completion_balance",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "找不到此工廠的 completion_id"
+ },
+ {
+  "code": "COMMAND_ACTOR_EVIDENCE_REQUIRED",
+  "action": "放行、包裝、繳庫、核准、更正",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "缺 command_id、actor 或 evidence_ref"
+ },
+ {
+  "code": "COMMAND_CONFLICT",
+  "action": "放行、包裝、繳庫、核准、更正",
+  "category": "CONFLICT",
+  "category_zh": "衝突",
+  "meaning": "command_id 已用過且內容不同；新指令請用新的 command_id"
+ },
+ {
+  "code": "CORRECTION_HOLD",
+  "action": "放行、包裝、繳庫、核准、request_correction、cancel_document",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "此報工有未結的更正案件，暫停後續作業"
+ },
+ {
+  "code": "COMPLETION_CANCELLED",
+  "action": "放行、包裝、繳庫、核准",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "報工交易已作廢"
+ },
+ {
+  "code": "NO_FINISHED_MATERIAL",
+  "action": "放行、包裝、繳庫、核准",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "工單沒有成品料號（例 ZR02、ZW01），只能報工與耗料"
+ },
+ {
+  "code": "ORDER_NOT_OPEN_OR_CHANGED",
+  "action": "放行、包裝、繳庫、核准",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "工單已結案、刪除，或場區、成品料號已變更"
+ },
+ {
+  "code": "INVALID_RELEASE",
+  "action": "release_quality",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "release_id、pieces 或 source_ref 缺漏或格式錯誤"
+ },
+ {
+  "code": "RELEASE_EXCEEDS_GOOD",
+  "action": "release_quality",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "累計放行量超過良品量"
+ },
+ {
+  "code": "RELEASE_NOT_FOUND",
+  "action": "record_packaging",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "release_id 不屬於此報工"
+ },
+ {
+  "code": "PACKAGE_INTEGER_REQUIRED",
+  "action": "record_packaging、submit_receipt",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "actual_packages、loose_pieces 須為 0 以上整數"
+ },
+ {
+  "code": "PACKAGE_RATE_OR_VERSION",
+  "action": "record_packaging",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "包裝單位查不到整數換算（須大於 1 片），或 uom_version 不符"
+ },
+ {
+  "code": "MATERIAL_UPDATE_PENDING",
+  "action": "record_packaging、submit_receipt",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "非工單單位、未帶 uom_version，且有此料號尚未 ack 的 MASTER／ORDER 事件"
+ },
+ {
+  "code": "PACKAGE_EXCEEDS_RELEASE",
+  "action": "record_packaging",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "累計包裝片數超過放行量，或片數為 0"
+ },
+ {
+  "code": "PACKAGE_NOT_FOUND",
+  "action": "submit_receipt",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "package_id 不屬於此報工"
+ },
+ {
+  "code": "RECEIPT_EXCEEDS_PACKAGE",
+  "action": "submit_receipt",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "累計繳庫箱數或散片超過包裝紀錄（已退回、已沖銷者不計）"
+ },
+ {
+  "code": "RECEIPT_BALANCE_OR_VERSION",
+  "action": "submit_receipt",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "繳庫數量換算後 ≠ 箱數 × 每箱片數 ＋ 散片，或小數超過 3 位，或 uom_version 不符"
+ },
+ {
+  "code": "STORAGE_REQUIRED",
+  "action": "submit_receipt",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "缺 receipt.storage_location"
+ },
+ {
+  "code": "ASRS_MANAGED_SLOC",
+  "action": "submit_receipt、submit_goods_movement（耗料）",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "2 開頭的自動倉儲位不經中介庫（繳庫可由 GR_ASRS_SLOC_ALLOWED 放行）"
+ },
+ {
+  "code": "INVALID_SHIFT",
+  "action": "submit_receipt、cancel_document",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "shift 有帶但不是 A／B／C"
+ },
+ {
+  "code": "POSTING_DATE_SHIFT_REQUIRED",
+  "action": "submit_receipt、submit_goods_movement、cancel_document",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "缺過帳日期，或 SHIFT_REQUIRED = Y 時缺班別"
+ },
+ {
+  "code": "RECEIPT_FIELDS_REQUIRED",
+  "action": "submit_receipt",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "缺 posting_date 或 gr_txn_id"
+ },
+ {
+  "code": "RECEIPT_NOT_DRAFT",
+  "action": "decide_receipt",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "繳庫單不存在，或已不是 DRAFT"
+ },
+ {
+  "code": "REJECTION_REASON_REQUIRED",
+  "action": "decide_receipt",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "退回須填 reason"
+ },
+ {
+  "code": "ORDER_CHANGED_REJECT_RESUBMIT",
+  "action": "decide_receipt",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "繳庫申請後工單版本已變更；請退回後重新申請"
+ },
+ {
+  "code": "UOM_CHANGED_REJECT_RESUBMIT",
+  "action": "decide_receipt",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "繳庫申請後物料換算已變更（非工單單位時）；請退回後重新申請"
+ },
+ {
+  "code": "INVALID_DECISION",
+  "action": "decide_receipt",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "decision 不是 APPROVE 或 REJECT"
+ },
+ {
+  "code": "CORRECTION_REASON_REQUIRED",
+  "action": "request_correction",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "缺 reason"
+ },
+ {
+  "code": "POSTED_ORIGINAL_REQUIRED",
+  "action": "request_correction",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "original_txn_id 不是此報工已過帳（POSTED）的交易"
+ },
+ {
+  "code": "RECONCILE_INFLIGHT_FIRST",
+  "action": "request_correction",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "此報工仍有 CLAIMED／UNKNOWN 交易，須先對帳"
+ },
+ {
+  "code": "CASE_NOT_OPEN",
+  "action": "resolve_correction",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "更正案件不存在或已結案"
+ },
+ {
+  "code": "SAP_CORRECTION_EVIDENCE_REQUIRED",
+  "action": "resolve_correction",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "outcome 須為 NO_CHANGE／ADJUSTED，且須有 sap_log_ref、reason"
+ },
+ {
+  "code": "CORRECTION_DOCUMENTS_REQUIRED",
+  "action": "resolve_correction",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "ADJUSTED 須附 documents"
+ },
+ {
+  "code": "CORRECTION_DOCUMENT_FIELDS_REQUIRED",
+  "action": "resolve_correction",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "documents 每列須有 document_no、kind、reference"
+ },
+ {
+  "code": "MOVEMENT_PURPOSE_NOT_SUPPORTED",
+  "action": "submit_goods_movement",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "purpose 不是 AY_RECEIPT 或 CONSUMPTION（備品 SPARE 尚未開放）"
+ },
+ {
+  "code": "ORDER_NOT_OPEN",
+  "action": "submit_goods_movement",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "工單未下達、已結案或已刪除"
+ },
+ {
+  "code": "ITEMS_REQUIRED",
+  "action": "submit_goods_movement",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "items 為空"
+ },
+ {
+  "code": "INVALID_MOVEMENT_ITEM",
+  "action": "submit_goods_movement",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "明細格式錯誤：line_no、移動類型、料號、數量（> 0，最多 3 位小數）、單位、儲位"
+ },
+ {
+  "code": "DUPLICATE_LINE_NO",
+  "action": "submit_goods_movement",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "line_no 重複"
+ },
+ {
+  "code": "AY_NO_RESERVATION",
+  "action": "submit_goods_movement（AY）",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "AY 入庫不可帶保留項目"
+ },
+ {
+  "code": "AY_PAIR_MISSING",
+  "action": "submit_goods_movement（AY）",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "缺 531，或須搭配紙箱卻缺 261"
+ },
+ {
+  "code": "AY_PACK_NOT_EXPECTED",
+  "action": "submit_goods_movement（AY）",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "全部為袋裝 AY（AY_NO_PACK_MATERIALS）卻帶 261"
+ },
+ {
+  "code": "AY_MATERIAL_NOT_MAPPED",
+  "action": "submit_goods_movement（AY）",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "531 料號不在此工單成品的 A→AY 對照內"
+ },
+ {
+  "code": "AY_MATERIAL_NOT_ZHAL",
+  "action": "submit_goods_movement（AY）",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "531 料號的物料類型不是 ZHAL（或物料主檔尚未下傳）"
+ },
+ {
+  "code": "AY_SLOC_NOT_ALLOWED",
+  "action": "submit_goods_movement（AY）",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "531 儲位不在 AY_RECEIPT_SLOC"
+ },
+ {
+  "code": "AY_PACK_MATERIAL_NOT_ALLOWED",
+  "action": "submit_goods_movement（AY）",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "261 料號不在 AY_PACK_MATERIALS"
+ },
+ {
+  "code": "AY_PACK_COUNT_MISMATCH",
+  "action": "submit_goods_movement（AY）",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "531 全部以箱（B）送時，箱數合計 ≠ 紙箱 261 合計"
+ },
+ {
+  "code": "RESERVATION_REQUIRED",
+  "action": "submit_goods_movement（耗料）",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "耗料每列須帶 reservation_no、reservation_item"
+ },
+ {
+  "code": "COMPONENT_NOT_IN_ORDER",
+  "action": "submit_goods_movement（耗料）",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "保留項目＋料號不在此工單的元件內"
+ },
+ {
+  "code": "BACKFLUSH_COMPONENT",
+  "action": "submit_goods_movement（耗料）",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "倒扣料由 SAP 自動扣，MES 不可送"
+ },
+ {
+  "code": "UOM_CONVERSION_FAILED",
+  "action": "submit_goods_movement（耗料）",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "單位不是需求單位、料號換算單位或同維度單位"
+ },
+ {
+  "code": "INVALID_LIMIT",
+  "action": "claim_delivery、claim_sap、list_sap",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "limit 超出範圍"
+ },
+ {
+  "code": "REVERSAL_REASON_REQUIRED",
+  "action": "cancel_document",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "缺 reason 或超過 255 字"
+ },
+ {
+  "code": "POSTING_DATE_REQUIRED",
+  "action": "cancel_document",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "缺 posting_date"
+ },
+ {
+  "code": "TARGET_DOCUMENT_REQUIRED",
+  "action": "cancel_document",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "缺 document_no（≤ 10 碼）或 document_year（4 位數字）"
+ },
+ {
+  "code": "NOT_MATERIAL_DOCUMENT",
+  "action": "cancel_document",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "指定的是報工確認號碼；取消報工請走 request_correction"
+ },
+ {
+  "code": "TARGET_DOCUMENT_NOT_FOUND",
+  "action": "cancel_document",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "中介庫沒有這張物料文件"
+ },
+ {
+  "code": "TARGET_DOCUMENT_AMBIGUOUS",
+  "action": "cancel_document",
+  "category": "MANUAL",
+  "category_zh": "人工",
+  "meaning": "同一文件號碼對到多筆交易"
+ },
+ {
+  "code": "CANNOT_REVERSE_REVERSAL",
+  "action": "cancel_document",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "不可沖銷沖銷文件"
+ },
+ {
+  "code": "TARGET_NOT_POSTED",
+  "action": "cancel_document",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "原交易不是 POSTED"
+ },
+ {
+  "code": "DOCUMENT_ALREADY_REVERSED",
+  "action": "cancel_document",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "此文件已有處理中、失敗待處理或已過帳的沖銷"
+ },
+ {
+  "code": "CANCEL_REASON_REQUIRED",
+  "action": "cancel_txn",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "缺 actor 或 reason"
+ },
+ {
+  "code": "TXN_NOT_FOUND",
+  "action": "cancel_txn",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "找不到交易"
+ },
+ {
+  "code": "TXN_ALREADY_CANCELLED",
+  "action": "cancel_txn",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "交易已作廢（且作廢內容不同）"
+ },
+ {
+  "code": "TXN_NOT_CANCELLABLE",
+  "action": "cancel_txn",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "只有 PENDING／APPROVED／FAILED 可作廢；CLAIMED／UNKNOWN／REVIEW 可能正在過帳，POSTED 須走更正或沖銷"
+ },
+ {
+  "code": "CANCEL_BLOCKED_DOWNSTREAM",
+  "action": "cancel_txn",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "有有效的後續交易（例 PP 之後的 GR），或報工已放行"
+ },
+ {
+  "code": "STALE_DELIVERY_TOKEN",
+  "action": "ack_delivery",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "claim_token 已失效（租約逾時後被重新認領）；以新取得的 token 處理"
+ },
+ {
+  "code": "STALE_SAP_TOKEN",
+  "action": "sap_result、retry_sap",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "claim_token 不符或已失效"
+ },
+ {
+  "code": "INVALID_STATE_TRANSITION",
+  "action": "sap_result",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "不允許的狀態轉換（見狀態章節）"
+ },
+ {
+  "code": "RECONCILIATION_REQUIRED",
+  "action": "sap_result",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "UNKNOWN 交易回寫結果須 reconciled = true"
+ },
+ {
+  "code": "RESULT_REASON_REQUIRED",
+  "action": "sap_result",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "REVIEW／APPROVED／REJECTED／FAILED／UNKNOWN 須有 message"
+ },
+ {
+  "code": "SAP_REVIEWER_REQUIRED",
+  "action": "sap_result",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "APPROVED／REJECTED 須有 sap_user"
+ },
+ {
+  "code": "SAP_DOCUMENTS_REQUIRED",
+  "action": "sap_result",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "POSTED 須附 documents"
+ },
+ {
+  "code": "POSTED_WITH_ERROR_MESSAGE",
+  "action": "sap_result",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "POSTED 卻含 E／A／X 訊息"
+ },
+ {
+  "code": "DOCUMENT_FIELDS_REQUIRED",
+  "action": "sap_result",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "documents 每列須有 document_no、posted_uom"
+ },
+ {
+  "code": "CONFIRMATION_REFERENCE_REQUIRED",
+  "action": "sap_result",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "PP_CONFIRM 的文件須 kind = CONFIRMATION 且有 counter"
+ },
+ {
+  "code": "MATERIAL_REFERENCE_REQUIRED",
+  "action": "sap_result",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "物料類交易的文件須 kind = MATERIAL 且有 year"
+ },
+ {
+  "code": "POSTED_PRECISION_INVALID",
+  "action": "sap_result",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "posted_qty 超過小數 3 位"
+ },
+ {
+  "code": "POSTED_UOM_OR_QUANTITY_INVALID",
+  "action": "sap_result（GR）",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "過帳數量 ≤ 0，或過帳單位不在 uom_snapshot"
+ },
+ {
+  "code": "POSTED_QUANTITY_MISMATCH_RECONCILE",
+  "action": "sap_result（GR）",
+  "category": "MANUAL",
+  "category_zh": "人工",
+  "meaning": "過帳數量換算片數 ≠ 繳庫片數，須對帳"
+ },
+ {
+  "code": "RETRY_STATE_NOT_ALLOWED",
+  "action": "retry_sap",
+  "category": "STATE",
+  "category_zh": "狀態",
+  "meaning": "只有 FAILED／UNKNOWN 可重試"
+ },
+ {
+  "code": "RETRY_RECONCILIATION_EVIDENCE_REQUIRED",
+  "action": "retry_sap",
+  "category": "DATA",
+  "category_zh": "資料",
+  "meaning": "須 confirmed_not_posted = true，並有 sap_user、sap_log_ref、reason"
+ },
+ {
+  "code": "RETRY_LIMIT_MANUAL_REPAIR",
+  "action": "retry_sap",
+  "category": "MANUAL",
+  "category_zh": "人工",
+  "meaning": "同一交易已重試 3 次，改人工處理"
+ }
+]

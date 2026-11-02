@@ -83,3 +83,7 @@ Lệnh quản trị yêu cầu quyền truy cập hạ tầng, phải có nhật
 - [Kết quả xác minh](docs/verification.md)
 
 API tương tác tại `/api/docs`, OpenAPI tại `/api/openapi.json`. `/health/live` kiểm tra tiến trình; `/health/ready` kiểm tra kết nối và schema. Không tự nâng cấp schema khi khởi động web.
+
+## Fuburg workflow
+
+The Fuburg module adds SAP order intake, shift production with A/B/C grades, supervisor confirmation, QA release, packaging, warehouse decisions, AY by-products and shift consumption allocation. Open **Fuburg operations** for configured plants. See [setup, roles, migrations and integration limits](docs/fuburg.md). External synchronization is disabled in the example configuration.
