@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from .db import Base, database_url, make_engine
 from .models import Grant, Lot, Plant, Route, SchemaVersion, User
 from .security import hash_password
+from .fuburg import schema as fuburg_schema
 
 def initialize(engine):
     if inspect(engine).has_table("schema_version"):
@@ -28,6 +29,9 @@ def initialize(engine):
             for table in ("audit_events", "routes"):
                 for action in ("UPDATE", "DELETE"):
                     connection.execute(text(f"CREATE TRIGGER {table}_{action.lower()} BEFORE {action} ON {table} BEGIN SELECT RAISE(ABORT, 'Immutable MES record'); END"))
+
+    import importlib
+    importlib.import_module("migrations.002_fuburg_workflow").upgrade(engine)
 
 def seed_demo(engine, password):
     with Session(engine) as db, db.begin():
