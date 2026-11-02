@@ -329,6 +329,9 @@ def create_app(engine=None):
         return [{"id": a.id, "at": a.created_at.isoformat(), "actor": u.username, "action": a.action, "entity": a.entity, "entity_id": a.entity_id, "payload": a.payload}
                 for a, u in db.execute(query.order_by(Audit.id.desc()).limit(100))]
 
+    from .fuburg.routes import install
+    install(app, current_user, db_session, access)
+
     static = Path(__file__).parent / "static"
     app.mount("/static", StaticFiles(directory=static), name="static")
 

@@ -1,0 +1,144 @@
+{
+  "_note": "Giá trị lấy từ 03_configuration.sql v2.1-v12. Mục có status=PENDING là chưa được 富堡 xác nhận chính thức – MES phải đọc từ cấu hình, KHÔNG hard-code.",
+  "plants": {
+    "1011": {
+      "name": "台灣廠",
+      "timezone": "Asia/Taipei",
+      "shifts": {
+        "A": "08:00-16:00",
+        "B": "16:00-24:00",
+        "C": "00:00-08:00",
+        "_source": "製造部 10/08"
+      },
+      "shift_required": true,
+      "grade_rule_ref": {
+        "value": "GR-V1",
+        "status": "PENDING",
+        "_note": "淳安 đề xuất GR-V1; test dùng REAL-TEST"
+      },
+      "grades": [
+        {
+          "grade_code": "A",
+          "disposition": "GOOD",
+          "meaning": "良品 – tính vào good_pieces, đi PP→GR 101"
+        },
+        {
+          "grade_code": "B",
+          "disposition": "AY",
+          "meaning": "AY品 – không tính good/scrap, nhập kho riêng bằng 531"
+        },
+        {
+          "grade_code": "C",
+          "disposition": "SCRAP",
+          "meaning": "廢品 – tính vào scrap_pieces"
+        }
+      ],
+      "sites": {
+        "status": "PENDING",
+        "proposal": "site = mã work center",
+        "known_work_centers": [
+          "AD103",
+          "AD102"
+        ],
+        "mapped_now": {
+          "AD103": "TW_MAIN"
+        },
+        "_note": "Lệnh có main_work_center chưa map → intf trả UNKNOWN_SITE khi publish_order"
+      },
+      "ay_receipt_sloc": [
+        "1101",
+        "2101"
+      ],
+      "ay_pack_required": true,
+      "ay_pack_materials": [
+        "PCT001511",
+        "PCT0015211",
+        "PCT0015231"
+      ],
+      "ay_no_pack_materials": [],
+      "ay_pack_map": {
+        "D001501": "PCT001511",
+        "D001511": "PCT001511",
+        "D0015141": "PCT001511",
+        "D0015211": "PCT0015211",
+        "D0015241": "PCT0015211",
+        "D0015231": "PCT0015231",
+        "_source": "富堡 Dennis 10/07 điểm 2"
+      },
+      "ay_map_file": "ay_map_1011.csv (36 dòng, 製造部 10/09)",
+      "gr_asrs_sloc_allowed": [],
+      "_rule_sloc": "Kho 2* là kho tự động (ASRS): GR 101 và CONSUMPTION bị chặn ASRS_MANAGED_SLOC; riêng AY 531 được vào 2101",
+      "integration_enabled": false,
+      "carton_sloc": null
+    },
+    "2101": {
+      "name": "泰國廠",
+      "timezone": "Asia/Bangkok",
+      "shifts": {
+        "A": "08:00-16:00",
+        "B": "16:00-24:00",
+        "C": "00:00-08:00",
+        "_source": "giả định giống 1011 – cần xác nhận"
+      },
+      "shift_required": true,
+      "grade_rule_ref": {
+        "value": "GR-V1",
+        "status": "PENDING"
+      },
+      "grades": [
+        {
+          "grade_code": "A",
+          "disposition": "GOOD"
+        },
+        {
+          "grade_code": "B",
+          "disposition": "AY"
+        },
+        {
+          "grade_code": "C",
+          "disposition": "SCRAP"
+        }
+      ],
+      "sites": {
+        "status": "PENDING",
+        "proposal": "site = mã work center",
+        "known_work_centers": [
+          "CU101",
+          "CU102"
+        ],
+        "mapped_now": {},
+        "test_only": {
+          "CU101": "TH_MAIN",
+          "CU102": "TH_MAIN"
+        }
+      },
+      "ay_receipt_sloc": [
+        "1101"
+      ],
+      "ay_pack_required": true,
+      "ay_pack_materials": [
+        "PCTAYCU2"
+      ],
+      "ay_no_pack_materials": [
+        "D030309",
+        "D030308"
+      ],
+      "ay_pack_map": {
+        "D030306": "PCTAYCU2",
+        "D03033": "PCTAYCU2",
+        "D0304400": "PCTAYCU2",
+        "_source": "製造部 10/14 – 1 thùng AY lấy 1 thùng carton"
+      },
+      "ay_map_file": "ay_map_2101.csv (19 dòng)",
+      "gr_asrs_sloc_allowed": [],
+      "integration_enabled": false,
+      "carton_sloc": null
+    }
+  },
+  "units": {
+    "order_uom": "Đơn vị lệnh (thường B=箱) quy đổi theo order_uom_rate trong ORDER event (AFPO, v10) – KHÔNG dùng MARM",
+    "other_uom": "PK, EA… quy đổi theo material.uoms (MARM): 1 uom = numerator/denominator EA",
+    "loose_rule": "Nhập kho có lẻ không chia hết số thùng → gửi receipt bằng EA",
+    "quantity_precision": "Tối đa 3 chữ số thập phân; pieces luôn là số nguyên dạng chuỗi"
+  }
+}

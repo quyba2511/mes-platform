@@ -27,3 +27,4 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql+psycopg://test:test_ci_only@localhost:5432/mes_test
       - run: node --check app/static/app.js
+      - run: node --check app/static/fuburg.js
